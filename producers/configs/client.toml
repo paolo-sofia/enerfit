@@ -1,0 +1,10 @@
+[info]
+name = "client-producer"
+topic = "client_topic"
+frequency = 1.0
+input_data_path = "data/predict-energy-behavior-of-prosumers/client.csv"
+
+[producer]
+bootstrap_servers = "broker:9092"
+acks = 0
+api_version = [3, 4, 0]
