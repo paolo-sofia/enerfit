@@ -1,0 +1,2 @@
+notebook==7.0.7
+plotly==5.18.0
