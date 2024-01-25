@@ -1,6 +1,5 @@
 # Deve essere un cron job che parte a mezzanotte e salva tutti i dati giornalieri sul datalake, quindi farlo con airflow o qualcosa di simile
 import datetime
-import json
 import pathlib
 from dataclasses import dataclass
 from typing import Any
@@ -8,16 +7,15 @@ from typing import Any
 import pandas as pd
 import polars as pl
 import pytz
-from kafka3 import KafkaConsumer
 
+from consumers.utils import (
+    commit_processed_messages_from_topic_from_day,
+    fetch_data_at_day,
+    save_to_datalake_partition_by_date,
+)
 from utils.configs import load_config
 from utils.io import create_base_output_path_paritioned_by_date
-from utils.kafka import (
-    create_consumer_and_seek_to_last_committed_message,
-    create_kafka_consumer,
-    kafka_consumer_seek_to_last_committed_message,
-)
-from utils.polars import cast_column_to_16_bits_numeric, cast_column_to_datetime
+from utils.polars import cast_column_to_16_bits_numeric, cast_column_to_32_bits_numeric, cast_column_to_datetime
 
 ENCODING: str = "utf-8"
 BASE_PATH: pathlib.Path = pathlib.Path()
@@ -38,52 +36,6 @@ class ElectricityColumns:
     euros_per_mwh: str = "euros_per_mwh"
     origin_date: str = "origin_date"
     data_block_id: str = "data_block_id"
-
-
-def fetch_electricity_at_day(config: dict[str, Any], day: datetime.date) -> pl.DataFrame:
-    """Fetches electricity data for a specific day from a Kafka topic.
-
-    Args:
-        config (dict): A dictionary containing the Kafka consumer configuration.
-        day (datetime.date): The specific day to fetch electricity data for.
-
-    Returns:
-        pl.DataFrame: The electricity data for the specified day.
-    """
-    consumer: KafkaConsumer = create_consumer_and_seek_to_last_committed_message(config)
-
-    day_messages: list[dict] = []
-    for message in consumer:
-        message_dict: dict = json.loads(message.decode(ENCODING))
-        if message_dict.get(ElectricityColumns.forecast_date) == day:
-            day_messages.append(message_dict)
-
-    data = pl.from_dicts(day_messages)
-    data = cast_column_to_datetime(
-        data,
-        column_names=[ElectricityColumns.forecast_date, ElectricityColumns.origin_date],
-        datetime_format="%Y-%m-%d %H:%M:%S",
-        timezone=pytz.timezone("Europe/Tallin"),
-    )
-    return data.filter(pl.col(ElectricityColumns.forecast_date) == day)
-
-
-def commit_processed_messages_from_topic(day: datetime.date, encoding: str = "utf-8") -> None:
-    """Commits processed messages from a Kafka topic for a specific day.
-
-    Args:
-        day (datetime.date): The specific day to filter the messages.
-        encoding (str, optional): The encoding used for deserializing messages. Defaults to "utf-8".
-
-    Returns:
-        None
-    """
-    consumer: KafkaConsumer = create_kafka_consumer({})
-    consumer = kafka_consumer_seek_to_last_committed_message(consumer)
-
-    for message in consumer:
-        if json.loads(message.decode(encoding)).get("date") == day:
-            consumer.commit()
 
 
 def save_electricity_to_datalake(data: pd.DataFrame, day: datetime.date) -> bool:
@@ -125,6 +77,25 @@ def update_processed_electricity_table(is_processed: bool, day: datetime.date) -
     pass
 
 
+def preprocess_electricity_data(data: pl.DataFrame) -> pl.DataFrame:
+    """Preprocesses electricity data by casting columns to specific data types.
+
+    Args:
+        data (pl.DataFrame): The electricity data to be preprocessed.
+
+    Returns:
+        pl.DataFrame: The preprocessed electricity data.
+    """
+    data = cast_column_to_datetime(
+        data=data,
+        column_names=[ElectricityColumns.forecast_date, ElectricityColumns.origin_date],
+        datetime_format="%Y-%m-%d %H:%M:%S",
+        timezone=pytz.timezone("Europe/Tallin"),
+    )
+    data = cast_column_to_32_bits_numeric(data)
+    return cast_column_to_16_bits_numeric(data)
+
+
 def main() -> None:
     """Runs the main function to process electricity data.
 
@@ -138,15 +109,21 @@ def main() -> None:
     )
 
     # Prenditi tutti i dati di ieri da kafka
-    electricity: pl.DataFrame = fetch_electricity_at_day(config=config, day=yesterday)
+    electricity: pl.DataFrame = fetch_data_at_day(
+        config=config, day=yesterday, filter_col=ElectricityColumns.forecast_date
+    )
+
     if electricity.is_empty():
         print(f"No data from {yesterday}")
         update_processed_electricity_table(True, yesterday)
+        return
 
-    electricity = cast_column_to_16_bits_numeric(electricity)
+    electricity = preprocess_electricity_data(electricity)
 
-    if data_saved := save_electricity_to_datalake(electricity, yesterday):
-        commit_processed_messages_from_topic(yesterday)
+    if data_saved := save_to_datalake_partition_by_date(
+        data=electricity, day=yesterday, base_path=BASE_PATH, filename="electricity"
+    ):
+        commit_processed_messages_from_topic_from_day(day=yesterday, filter_col=ElectricityColumns.forecast_date)
 
     update_processed_electricity_table(data_saved, yesterday)
 
