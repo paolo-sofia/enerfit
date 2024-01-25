@@ -1,24 +1,210 @@
 # Deve essere un cron job che parte a mezzanotte e salva tutti i dati giornalieri sul datalake, quindi farlo con airflow o qualcosa di simile
 import datetime
+import json
+import pathlib
+from dataclasses import dataclass
 
 import pandas as pd
+import polars as pl
 import pytz
+from kafka3 import KafkaConsumer
+
+from utils.kafka_utils import (
+    commit_processed_messages_from_topic,
+    create_kafka_consumer,
+    kafka_consumer_seek_to_last_committed_message,
+)
+from utils.polars_utils import cast_column_to_32_bits_numeric, cast_column_to_date
+
+ENCODING: str = "utf-8"
+COUNTY_MAP_PATH: pathlib.Path = pathlib.Path() / "data" / "county_id_to_name_map.json"
+BASE_PATH: pathlib.Path = pathlib.Path()
+
+product_type_map: dict[int, str] = {0: "Combined", 1: "Fixed", 2: "General service", 3: "Spot"}
 
 
-def preprocess_clients_columns(data: pd.DataFrame) -> pd.DataFrame:
-    return pd.DataFrame()
+@dataclass
+class ClientsColumns:
+    """A dataclass representing the column names for the Clients dataset.
+
+    Attributes:
+        product_type (str): The column name for the product type.
+        county (str): The column name for the county.
+        eic_count (str): The column name for the EIC count.
+        installed_capacity (str): The column name for the installed capacity.
+        is_business (str): The column name for the business indicator.
+        date (str): The column name for the date.
+        data_block_id (str): The column name for the data block ID.
+    """
+
+    product_type: str = "product_type"
+    county: str = "county"
+    eic_count: str = "eic_count"
+    installed_capacity: str = "installed_capacity"
+    is_business: str = "is_business"
+    date: str = "date"
+    data_block_id: str = "data_block_id"
 
 
-def set_column_types(data: pd.DataFrame) -> pd.DataFrame:
-    return pd.DataFrame()
+def preprocess_product_type(data: pl.DataFrame) -> pl.DataFrame:
+    """Preprocesses the product type column in the given DataFrame.
+
+    Args:
+        data (pd.DataFrame): The DataFrame containing the product type column.
+
+    Returns:
+        pd.DataFrame: The DataFrame with the product type column preprocessed.
+
+    Examples:
+        >>> data = pd.DataFrame({"product_type": ["A", "B", "C"]})
+        >>> preprocess_product_type(data)
+           product_type
+        0             A
+        1             B
+        2             C
+    """
+    # data["product_type"] = data["product_type"].apply(lambda x: product_type_map.get(x, x))
+    return data.with_columns([pl.col(ClientsColumns.product_type).apply(lambda x: product_type_map.get(x, x))])
 
 
-def fetch_clients_at_day(day: datetime.date) -> pd.DataFrame:
-    return pd.DataFrame()
+def preprocess_county(data: pl.DataFrame) -> pl.DataFrame:
+    """Preprocesses the county column in the given DataFrame.
+
+    Args:
+        data (pd.DataFrame): The DataFrame containing the county column.
+
+    Returns:
+        pd.DataFrame: The DataFrame with the county column preprocessed.
+
+    Examples:
+        >>> data = pd.DataFrame({"county": [1, 2, 3]})
+        >>> preprocess_county(data)
+           county
+        0  County1
+        1  County2
+        2  County3
+    """
+    with COUNTY_MAP_PATH.open("r") as f:
+        county_id_to_name_map: dict[int, str] = json.load(f)
+
+    return data.with_columns([pl.col(ClientsColumns.county).apply(lambda x: county_id_to_name_map.get(x, "Unknown"))])
+
+
+def preprocess_is_business(data: pl.DataFrame) -> pl.DataFrame:
+    """Preprocesses the is_business column in the given DataFrame by replacing 0 with False and 1 with True.
+
+    Args:
+        data (pd.DataFrame): The DataFrame containing the is_business column.
+
+    Returns:
+        pd.DataFrame: The DataFrame with the is_business column preprocessed.
+
+    Examples:
+        >>> data = pd.DataFrame({"is_business": [0, 1, 0]})
+        >>> preprocess_is_business(data)
+           is_business
+        0        False
+        1         True
+        2        False
+    """
+    return data.with_columns([pl.col(ClientsColumns.is_business).cast(pl.Boolean)])
+
+
+def preprocess_clients_columns(data: pl.DataFrame) -> pd.DataFrame:
+    """Preprocesses multiple columns in the given DataFrame.
+
+    This function applies a series of preprocessing steps to the product_type, county, date, and is_business columns in
+        the DataFrame.
+
+    Args:
+        data (pd.DataFrame): The DataFrame to be preprocessed.
+
+    Returns:
+        pd.DataFrame: The preprocessed DataFrame.
+
+    Examples:
+        >>> data = pd.DataFrame({"product_type": ["A", "B", "C"], "county": [1, 2, 3],
+            "date": ["2022-01-01", "2022-01-02", "2022-01-03"], "is_business": [0, 1, 0]})
+        >>> preprocess_clients_columns(data)
+           product_type   county       date  is_business
+        0             A  County1 2022-01-01        False
+        1             B  County2 2022-01-02         True
+        2             C  County3 2022-01-03        False
+    """
+    data = preprocess_product_type(data)
+    data = preprocess_county(data)
+    return preprocess_is_business(data)
+
+
+def fetch_clients_at_day(day: datetime.date) -> pl.DataFrame:
+    """Fetches client data at a specific day from a Kafka consumer.
+
+    This function creates a Kafka consumer and fetches client data from the specified day. The fetched data is returned
+        as a pandas DataFrame.
+
+    Args:
+        day (datetime.date): The specific day to fetch client data.
+
+    Returns:
+        pd.DataFrame: The DataFrame containing the fetched client data.
+    """
+    consumer: KafkaConsumer = create_kafka_consumer()
+    consumer = kafka_consumer_seek_to_last_committed_message(consumer)
+
+    day_messages: list[dict] = []
+    for message in consumer:
+        message_dict: dict = json.loads(message.decode(ENCODING))
+        if message_dict.get(ClientsColumns.date) == day:
+            day_messages.append(message_dict)
+
+    data = pl.from_dicts(day_messages)
+    return cast_column_to_date(data, ClientsColumns.date).filter(pl.col(ClientsColumns.date) == day)
+
+
+def commit_processed_messages_from_topic(day: datetime.date, encoding: str = "utf-8") -> None:
+    """Commits processed messages from a Kafka topic for a specific day.
+
+    Args:
+        day (datetime.date): The specific day to filter the messages.
+        encoding (str, optional): The encoding used for deserializing messages. Defaults to "utf-8".
+
+    Returns:
+        None
+    """
+    consumer: KafkaConsumer = create_kafka_consumer({})
+    consumer = kafka_consumer_seek_to_last_committed_message(consumer)
+
+    for message in consumer:
+        if json.loads(message.decode(encoding)).get("date") == day:
+            consumer.commit()
 
 
 def save_clients_to_datalake(data: pd.DataFrame, day: datetime.date) -> bool:
-    return False
+    """Saves client data to the datalake.
+
+    This function takes a DataFrame of client data and a specific day, and saves the data to the datalake. The data is
+        saved as a parquet file at the corresponding output path based on the given day.
+
+    Args:
+        data (pd.DataFrame): The DataFrame of client data to be saved.
+        day (datetime.date): The specific day associated with the client data.
+
+    Returns:
+        bool: True if the data is successfully saved, False otherwise.
+    """
+    output_path: pathlib.Path = create_base_output_path(day)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        data = pl.from_pandas(data)
+        data.write_parquet(output_path)
+        return True
+    except Exception as e:
+        print(e)
+        return False
+
+
+def update_processed_clients_table(is_processed: bool, day: datetime.date) -> bool:
+    pass
 
 
 if __name__ == "__main__":
@@ -26,13 +212,16 @@ if __name__ == "__main__":
         days=1
     )
 
-    ## Prenditi tutti i dati di ieri da kafka
-    clients: pd.DataFrame = fetch_clients_at_day(day=yesterday)
+    # Prenditi tutti i dati di ieri da kafka
+    clients: pl.DataFrame = fetch_clients_at_day(day=yesterday)
+    if clients.is_empty():
+        print(f"No data from {yesterday}")
+        update_processed_clients_table(True, yesterday)
 
-    clients = set_column_types(clients)
-
+    clients = cast_column_to_32_bits_numeric(clients)
     clients = preprocess_clients_columns(clients)
 
-    save_clients_to_datalake(
-        clients,
-    )
+    if data_saved := save_clients_to_datalake(clients, yesterday):
+        commit_processed_messages_from_topic(yesterday)
+
+    update_processed_clients_table(data_saved, yesterday)
