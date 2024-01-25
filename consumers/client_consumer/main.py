@@ -7,11 +7,13 @@ from typing import Any
 
 import pandas as pd
 import polars as pl
-from kafka3 import KafkaConsumer
 
-from consumers.utils import load_config_and_get_date_to_process
-from utils.io import create_base_output_path_paritioned_by_date
-from utils.kafka import create_kafka_consumer, kafka_consumer_seek_to_last_committed_message
+from consumers.utils import (
+    commit_processed_messages_from_topic_from_day,
+    fetch_data_at_day,
+    load_config_and_get_date_to_process,
+    save_to_datalake_partition_by_date,
+)
 from utils.polars import cast_column_to_32_bits_numeric, cast_column_to_date
 
 ENCODING: str = "utf-8"
@@ -129,90 +131,10 @@ def preprocess_clients_columns(data: pl.DataFrame) -> pd.DataFrame:
         1             B  County2 2022-01-02         True
         2             C  County3 2022-01-03        False
     """
+    data = cast_column_to_32_bits_numeric(data)
     data = preprocess_product_type(data)
     data = preprocess_county(data)
     return preprocess_is_business(data)
-
-
-def fetch_clients_at_day(config: dict[str, Any], day: datetime.date) -> pl.DataFrame:
-    """Fetches client data for a specific day from a Kafka topic.
-
-    Args:
-        config (dict): A dictionary containing the Kafka consumer configuration.
-        day (datetime.date): The specific day to fetch client data for.
-
-    Returns:
-        pl.DataFrame: The client data for the specified day.
-
-    Examples:
-        >>> config = {
-        ...     "bootstrap_servers": "localhost:9092",
-        ...     "auto_offset_reset": "earliest",
-        ...     "enable_auto_commit": True,
-        ...     "group_id": "my-group"
-        ... }
-        >>> day = datetime.date(2022, 1, 1)
-        >>> fetch_clients_at_day(config, day)
-        pl.DataFrame({
-            'col1': [1, 2, 3],
-            'col2': [4.5, 5.6, 6.7]
-        })
-    """
-    consumer: KafkaConsumer = create_kafka_consumer(config)
-    consumer = kafka_consumer_seek_to_last_committed_message(consumer)
-
-    day_messages: list[dict] = []
-    for message in consumer:
-        message_dict: dict = json.loads(message.decode(ENCODING))
-        if message_dict.get(ClientsColumns.date) == day:
-            day_messages.append(message_dict)
-
-    data = pl.from_dicts(day_messages)
-    return cast_column_to_date(data, ClientsColumns.date).filter(pl.col(ClientsColumns.date) == day)
-
-
-def commit_processed_messages_from_topic(day: datetime.date, encoding: str = "utf-8") -> None:
-    """Commits processed messages from a Kafka topic for a specific day.
-
-    Args:
-        day (datetime.date): The specific day to filter the messages.
-        encoding (str, optional): The encoding used for deserializing messages. Defaults to "utf-8".
-
-    Returns:
-        None
-    """
-    consumer: KafkaConsumer = create_kafka_consumer({})
-    consumer = kafka_consumer_seek_to_last_committed_message(consumer)
-
-    for message in consumer:
-        if json.loads(message.decode(encoding)).get("date") == day:
-            consumer.commit()
-
-
-def save_clients_to_datalake(data: pd.DataFrame, day: datetime.date) -> bool:
-    """Saves client data to the datalake.
-
-    This function takes a DataFrame of client data and a specific day, and saves the data to the datalake. The data is
-        saved as a parquet file at the corresponding output path based on the given day.
-
-    Args:
-        data (pd.DataFrame): The DataFrame of client data to be saved.
-        day (datetime.date): The specific day associated with the client data.
-
-    Returns:
-        bool: True if the data is successfully saved, False otherwise.
-    """
-    output_path: pathlib.Path = create_base_output_path_paritioned_by_date(
-        base_path=BASE_PATH, date=day, file_name="clients"
-    )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        data = pl.from_pandas(data)
-        data.write_parquet(output_path)
-        return True
-    except Exception as e:
-        print(e)
-        return False
 
 
 def update_processed_clients_table(is_processed: bool, day: datetime.date) -> bool:
@@ -239,16 +161,19 @@ def main() -> None:
     config, yesterday = load_config_and_get_date_to_process()
 
     # Prenditi tutti i dati di ieri da kafka
-    clients: pl.DataFrame = fetch_clients_at_day(config=config, day=yesterday)
+    clients: pl.DataFrame = fetch_data_at_day(config=config, day=yesterday, filter_col=ClientsColumns.date)
+    clients = cast_column_to_date(clients, ClientsColumns.date).filter(pl.col(ClientsColumns.date) == yesterday)
+
     if clients.is_empty():
         print(f"No data from {yesterday}")
         update_processed_clients_table(True, yesterday)
 
-    clients = cast_column_to_32_bits_numeric(clients)
     clients = preprocess_clients_columns(clients)
 
-    if data_saved := save_clients_to_datalake(clients, yesterday):
-        commit_processed_messages_from_topic(yesterday)
+    if data_saved := save_to_datalake_partition_by_date(
+        data=clients, day=yesterday, base_path=BASE_PATH, filename="clients"
+    ):
+        commit_processed_messages_from_topic_from_day(day=yesterday, filter_col=ClientsColumns.date)
 
     update_processed_clients_table(data_saved, yesterday)
 
