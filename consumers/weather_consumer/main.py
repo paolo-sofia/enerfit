@@ -67,31 +67,31 @@ class WeatherColumns:
     data_block_id: str = "data_block_id"
 
 
-def update_processed_gas_table(is_processed: bool, day: datetime.date) -> bool:
-    """Updates the processed gas table for a specific day.
+def update_processed_historical_weather_table(is_processed: bool, day: datetime.date) -> bool:
+    """Updates the processed historical weather table for a specific day.
 
     Args:
-        is_processed (bool): The flag indicating if the gas are processed or not.
-        day (datetime.date): The specific day to update the processed gas table for.
+        is_processed (bool): The flag indicating if the historical weather are processed or not.
+        day (datetime.date): The specific day to update the processed historical weather table for.
 
     Returns:
-        bool: True if the processed gas table was successfully updated, False otherwise.
+        bool: True if the processed historical weather table was successfully updated, False otherwise.
     """
     pass
 
 
-def preprocess_gas_data(data: pl.DataFrame) -> pl.DataFrame:
-    """Preprocesses gas data by casting columns to specific data types.
+def preprocess_historical_weather_data(data: pl.DataFrame) -> pl.DataFrame:
+    """Preprocesses historical weather data by casting columns to specific data types.
 
     Args:
-        data (pl.DataFrame): The gas data to be preprocessed.
+        data (pl.DataFrame): The historical weather data to be preprocessed.
 
     Returns:
-        pl.DataFrame: The preprocessed gas data.
+        pl.DataFrame: The preprocessed historical weather data.
 
     Examples:
         >>> data = pl.DataFrame(...)
-        >>> preprocess_gas_data(data)
+        >>> preprocess_historical_weather_data(data)
         pl.DataFrame(...)
     """
     data = cast_column_to_datetime(
@@ -105,7 +105,7 @@ def preprocess_gas_data(data: pl.DataFrame) -> pl.DataFrame:
 
 
 def main() -> None:
-    """Runs the main function to process gas data.
+    """Runs the main function to process historical weather data.
 
     Returns:
         None
@@ -123,17 +123,17 @@ def main() -> None:
 
     if historical_weather.is_empty():
         print(f"No data from {yesterday}")
-        update_processed_gas_table(True, yesterday)
+        update_processed_historical_weather_table(True, yesterday)
         return
 
-    historical_weather = preprocess_gas_data(historical_weather)
+    historical_weather = preprocess_historical_weather_data(historical_weather)
 
     if data_saved := save_to_datalake_partition_by_date(
         data=historical_weather, day=yesterday, base_path=BASE_PATH, filename="historical_weather"
     ):
         commit_processed_messages_from_topic_from_day(day=yesterday, filter_col=WeatherColumns.datetime)
 
-    update_processed_gas_table(data_saved, yesterday)
+    update_processed_historical_weather_table(data_saved, yesterday)
 
 
 if __name__ == "__main__":
