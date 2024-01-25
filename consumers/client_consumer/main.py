@@ -229,7 +229,12 @@ def update_processed_clients_table(is_processed: bool, day: datetime.date) -> bo
     pass
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Runs the main function to process client data.
+
+    Returns:
+        None
+    """
     config: dict[str, Any] = load_config(pathlib.Path(__file__).parent / "config.toml")
 
     yesterday: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Tallin")).date() - datetime.timedelta(
@@ -237,7 +242,7 @@ if __name__ == "__main__":
     )
 
     # Prenditi tutti i dati di ieri da kafka
-    clients: pl.DataFrame = fetch_clients_at_day(day=yesterday)
+    clients: pl.DataFrame = fetch_clients_at_day(config=config, day=yesterday)
     if clients.is_empty():
         print(f"No data from {yesterday}")
         update_processed_clients_table(True, yesterday)
@@ -249,3 +254,7 @@ if __name__ == "__main__":
         commit_processed_messages_from_topic(yesterday)
 
     update_processed_clients_table(data_saved, yesterday)
+
+
+if __name__ == "__main__":
+    main()
