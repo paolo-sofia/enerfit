@@ -7,10 +7,9 @@ from typing import Any
 
 import pandas as pd
 import polars as pl
-import pytz
 from kafka3 import KafkaConsumer
 
-from utils.configs import load_config
+from consumers.utils import load_config_and_get_date_to_process
 from utils.io import create_base_output_path_paritioned_by_date
 from utils.kafka import create_kafka_consumer, kafka_consumer_seek_to_last_committed_message
 from utils.polars import cast_column_to_32_bits_numeric, cast_column_to_date
@@ -235,11 +234,9 @@ def main() -> None:
     Returns:
         None
     """
-    config: dict[str, Any] = load_config(pathlib.Path(__file__).parent / "config.toml")
-
-    yesterday: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Tallin")).date() - datetime.timedelta(
-        days=1
-    )
+    config: dict[str, Any]
+    yesterday: datetime.date
+    config, yesterday = load_config_and_get_date_to_process()
 
     # Prenditi tutti i dati di ieri da kafka
     clients: pl.DataFrame = fetch_clients_at_day(config=config, day=yesterday)

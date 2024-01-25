@@ -5,14 +5,14 @@ from dataclasses import dataclass
 from typing import Any
 
 import polars as pl
-import pytz
 
 from consumers.utils import (
     commit_processed_messages_from_topic_from_day,
     fetch_data_at_day,
+    filter_data_by_date,
+    load_config_and_get_date_to_process,
     save_to_datalake_partition_by_date,
 )
-from utils.configs import load_config
 from utils.polars import (
     cast_column_to_16_bits_numeric,
     cast_column_to_32_bits_numeric,
@@ -80,11 +80,9 @@ def main() -> None:
     Returns:
         None
     """
-    config: dict[str, Any] = load_config(pathlib.Path(__file__).parent / "config.toml")
-
-    yesterday: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Tallin")).date() - datetime.timedelta(
-        days=1
-    )
+    config: dict[str, Any]
+    yesterday: datetime.date
+    config, yesterday = load_config_and_get_date_to_process()
 
     # Prenditi tutti i dati di ieri da kafka
     gas: pl.DataFrame = fetch_data_at_day(
@@ -99,6 +97,7 @@ def main() -> None:
         return
 
     gas = preprocess_gas_data(gas)
+    gas = filter_data_by_date(data=gas, filter_col=GasColumns.forecast_date, filter_date=yesterday)
 
     if data_saved := save_to_datalake_partition_by_date(data=gas, day=yesterday, base_path=BASE_PATH, filename="gas"):
         commit_processed_messages_from_topic_from_day(day=yesterday, filter_col=GasColumns.forecast_date)

@@ -11,9 +11,10 @@ import pytz
 from consumers.utils import (
     commit_processed_messages_from_topic_from_day,
     fetch_data_at_day,
+    filter_data_by_date,
+    load_config_and_get_date_to_process,
     save_to_datalake_partition_by_date,
 )
-from utils.configs import load_config
 from utils.io import create_base_output_path_paritioned_by_date
 from utils.polars import cast_column_to_16_bits_numeric, cast_column_to_32_bits_numeric, cast_column_to_datetime
 
@@ -102,13 +103,10 @@ def main() -> None:
     Returns:
         None
     """
-    config: dict[str, Any] = load_config(pathlib.Path(__file__).parent / "config.toml")
+    config: dict[str, Any]
+    yesterday: datetime.date
+    config, yesterday = load_config_and_get_date_to_process()
 
-    yesterday: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Tallin")).date() - datetime.timedelta(
-        days=1
-    )
-
-    # Prenditi tutti i dati di ieri da kafka
     electricity: pl.DataFrame = fetch_data_at_day(
         config=config, day=yesterday, filter_col=ElectricityColumns.forecast_date
     )
@@ -119,6 +117,9 @@ def main() -> None:
         return
 
     electricity = preprocess_electricity_data(electricity)
+    electricity = filter_data_by_date(
+        data=electricity, filter_col=ElectricityColumns.forecast_date, filter_date=yesterday
+    )
 
     if data_saved := save_to_datalake_partition_by_date(
         data=electricity, day=yesterday, base_path=BASE_PATH, filename="electricity"

@@ -1,11 +1,13 @@
+import datetime
 import json
 import pathlib
-from datetime import date, datetime
 from typing import Any
 
 import polars as pl
+import pytz
 from kafka3 import KafkaConsumer
 
+from utils.configs import load_config
 from utils.io import create_base_output_path_paritioned_by_date
 from utils.kafka import (
     create_consumer_and_seek_to_last_committed_message,
@@ -51,10 +53,25 @@ def fetch_data_at_day(
     return pl.from_dicts(day_messages)
 
 
-def filter_data_by_date(data: pl.DataFrame, filter_col: str, filter_date: datetime | date) -> pl.DataFrame:
-    if isinstance(filter_date, datetime):
+def filter_data_by_date(
+    data: pl.DataFrame, filter_col: str, filter_date: datetime.datetime | datetime.date
+) -> pl.DataFrame:
+    """Filters the given DataFrame based on a specified date.
+
+    Args:
+        data (pl.DataFrame): The DataFrame to be filtered.
+        filter_col (str): The column name to filter on.
+        filter_date (datetime.datetime | datetime.date): The date or datetime object to filter by.
+
+    Returns:
+        pl.DataFrame: The filtered DataFrame.
+
+    Raises:
+        TypeError: If the filter_date is not of type datetime.date or datetime.datetime.
+    """
+    if isinstance(filter_date, datetime.datetime):
         filter_date = filter_date.date()
-    if not isinstance(filter_date, date):
+    if not isinstance(filter_date, datetime.date):
         raise TypeError(f"filter_dates must be either date or datetime, given type is {type(filter_date)}")
 
     return data.filter(pl.col(filter_col) == filter_date)
@@ -104,3 +121,18 @@ def save_to_datalake_partition_by_date(
     except Exception as e:
         print(e)
         return False
+
+
+def load_config_and_get_date_to_process() -> tuple[dict[str, Any], datetime.date]:
+    """Loads the configuration and retrieves the date to process.
+
+    Returns:
+        tuple[dict[str, Any], datetime.date]: A tuple containing the loaded configuration as a dictionary and the date
+            to process as a `datetime.date` object.
+    """
+    config: dict[str, Any] = load_config(pathlib.Path(__file__).parent / "config.toml")
+
+    yesterday: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Tallin")).date() - datetime.timedelta(
+        days=1
+    )
+    return config, yesterday
