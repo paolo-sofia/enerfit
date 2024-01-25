@@ -65,6 +65,33 @@ def commit_processed_messages_from_topic() -> None:
         consumer.commit()
 
 
+def create_consumer_and_seek_to_last_committed_message(
+    config: dict[str, str], encoding: str = "utf-8"
+) -> KafkaConsumer:
+    """Creates a Kafka consumer with the provided configuration and seeks to the last committed message.
+
+    Args:
+        config (dict): A dictionary containing the Kafka consumer configuration.
+        encoding (str, optional): The encoding used for deserializing messages. Defaults to "utf-8".
+
+    Returns:
+        KafkaConsumer: The created Kafka consumer.
+
+    Examples:
+        >>> config = {
+        ...     "bootstrap_servers": "localhost:9092",
+        ...     "auto_offset_reset": "earliest",
+        ...     "enable_auto_commit": True,
+        ...     "group_id": "my-group"
+        ... }
+        >>> create_consumer_and_seek_to_last_committed_message(config)
+        <kafka.consumer.KafkaConsumer object at 0x7f9a3e6e5a90>
+    """
+    consumer: KafkaConsumer = create_kafka_consumer(config=config, encoding=encoding)
+    kafka_consumer_seek_to_last_committed_message(consumer)
+    return consumer
+
+
 def delete_topic(kafka_config: dict[str, str], topic_name: str) -> bool:
     """Deletes a Kafka topic or a list of Kafka topics.
 
