@@ -1,4 +1,5 @@
 [info]
+key = "weather-forecast-producer"
 name = "weather-forecast-producer"
 topic = "weather_forecast_topic"
 frequency = 1.0

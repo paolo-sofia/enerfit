@@ -1,4 +1,5 @@
 [info]
+key = "energy-producer"
 name = "energy-producer"
 topic = "energy_topic"
 frequency = 1.0

@@ -3,18 +3,17 @@ import datetime
 import json
 import pathlib
 from dataclasses import dataclass
+from typing import Any
 
 import pandas as pd
 import polars as pl
 import pytz
 from kafka3 import KafkaConsumer
 
-from utils.kafka_utils import (
-    commit_processed_messages_from_topic,
-    create_kafka_consumer,
-    kafka_consumer_seek_to_last_committed_message,
-)
-from utils.polars_utils import cast_column_to_32_bits_numeric, cast_column_to_date
+from utils.configs import load_config
+from utils.io import create_base_output_path_paritioned_by_date
+from utils.kafka import create_kafka_consumer, kafka_consumer_seek_to_last_committed_message
+from utils.polars import cast_column_to_32_bits_numeric, cast_column_to_date
 
 ENCODING: str = "utf-8"
 COUNTY_MAP_PATH: pathlib.Path = pathlib.Path() / "data" / "county_id_to_name_map.json"
@@ -136,19 +135,31 @@ def preprocess_clients_columns(data: pl.DataFrame) -> pd.DataFrame:
     return preprocess_is_business(data)
 
 
-def fetch_clients_at_day(day: datetime.date) -> pl.DataFrame:
-    """Fetches client data at a specific day from a Kafka consumer.
-
-    This function creates a Kafka consumer and fetches client data from the specified day. The fetched data is returned
-        as a pandas DataFrame.
+def fetch_clients_at_day(config: dict[str, Any], day: datetime.date) -> pl.DataFrame:
+    """Fetches client data for a specific day from a Kafka topic.
 
     Args:
-        day (datetime.date): The specific day to fetch client data.
+        config (dict): A dictionary containing the Kafka consumer configuration.
+        day (datetime.date): The specific day to fetch client data for.
 
     Returns:
-        pd.DataFrame: The DataFrame containing the fetched client data.
+        pl.DataFrame: The client data for the specified day.
+
+    Examples:
+        >>> config = {
+        ...     "bootstrap_servers": "localhost:9092",
+        ...     "auto_offset_reset": "earliest",
+        ...     "enable_auto_commit": True,
+        ...     "group_id": "my-group"
+        ... }
+        >>> day = datetime.date(2022, 1, 1)
+        >>> fetch_clients_at_day(config, day)
+        pl.DataFrame({
+            'col1': [1, 2, 3],
+            'col2': [4.5, 5.6, 6.7]
+        })
     """
-    consumer: KafkaConsumer = create_kafka_consumer()
+    consumer: KafkaConsumer = create_kafka_consumer(config)
     consumer = kafka_consumer_seek_to_last_committed_message(consumer)
 
     day_messages: list[dict] = []
@@ -192,7 +203,9 @@ def save_clients_to_datalake(data: pd.DataFrame, day: datetime.date) -> bool:
     Returns:
         bool: True if the data is successfully saved, False otherwise.
     """
-    output_path: pathlib.Path = create_base_output_path(day)
+    output_path: pathlib.Path = create_base_output_path_paritioned_by_date(
+        base_path=BASE_PATH, date=day, file_name="clients"
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         data = pl.from_pandas(data)
@@ -204,10 +217,21 @@ def save_clients_to_datalake(data: pd.DataFrame, day: datetime.date) -> bool:
 
 
 def update_processed_clients_table(is_processed: bool, day: datetime.date) -> bool:
+    """Updates the processed clients table for a specific day.
+
+    Args:
+        is_processed (bool): The flag indicating if the clients are processed or not.
+        day (datetime.date): The specific day to update the processed clients table for.
+
+    Returns:
+        bool: True if the processed clients table was successfully updated, False otherwise.
+    """
     pass
 
 
 if __name__ == "__main__":
+    config: dict[str, Any] = load_config(pathlib.Path(__file__).parent / "config.toml")
+
     yesterday: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Tallin")).date() - datetime.timedelta(
         days=1
     )

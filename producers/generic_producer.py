@@ -8,7 +8,7 @@ from typing import Self
 import pandas as pd
 import tomllib
 from kafka3 import KafkaProducer
-from kafka3.producer.future import FutureRecordMetadata
+from kafka3.errors import KafkaTimeoutError
 
 ENCODING: str = "utf-8"
 
@@ -73,6 +73,7 @@ class GenericProducer:
         self.name: str = config.get("info", {}).get("name", "")
         self.topic: str = config.get("info", {}).get("topic", "")
         self.frequency: float = float(config.get("info", {}).get("frequency", 1.0))
+        self.input_data_path: pathlib.Path = pathlib.Path(config.get("info", {}).get("input_data_path"))
 
     def publish_message(self: Self, row: pd.Series) -> None:
         """Publishes a message by sending the data readings to a specified topic.
@@ -87,10 +88,10 @@ class GenericProducer:
         data_readings: dict[str, str | pd.Series] = {"key": self.id, "name": self.name, "value": row.to_dict()}
         data_readings: bytes = json.dumps(data_readings).encode(ENCODING)
 
-        return_val: FutureRecordMetadata = self.producer.send(
-            topic=self.topic, value=data_readings, key=self.id.encode(ENCODING)
-        )
-        print(return_val)
+        try:
+            self.producer.send(topic=self.topic, value=data_readings, key=self.id.encode(ENCODING))
+        except KafkaTimeoutError as e:
+            print(e)
 
     def publish_producer_initialization(self: Self) -> None:
         """Publishes the producer initialization message to a specified topic.
@@ -119,8 +120,7 @@ class GenericProducer:
         """
         if not self.input_data_path:
             raise AttributeError("input_data_path must be set")
-
-        self.publish_info_initialization()
+        self.publish_producer_initialization()
         dataframe: pd.DataFrame = pd.read_csv(self.input_data_path)
         for _, row in dataframe.iterrows():
             self.publish_message(row)
