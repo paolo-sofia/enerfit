@@ -132,7 +132,7 @@ def load_config_and_get_date_to_process() -> tuple[dict[str, Any], datetime.date
     """
     config: dict[str, Any] = load_config(pathlib.Path(__file__).parent / "config.toml")
 
-    yesterday: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Tallin")).date() - datetime.timedelta(
+    yesterday: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Tallinn")).date() - datetime.timedelta(
         days=1
     )
     return config, yesterday

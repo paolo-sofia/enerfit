@@ -9,7 +9,7 @@ from consumers.client_consumer.main import main
 
 # Constants for tests
 CONFIG_PATH: pathlib.Path = pathlib.Path(__file__).parent / "config.toml"
-YESTERDAY: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Tallin")).date() - datetime.timedelta(days=1)
+YESTERDAY: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Tallinn")).date() - datetime.timedelta(days=1)
 
 
 @pytest.mark.parametrize(

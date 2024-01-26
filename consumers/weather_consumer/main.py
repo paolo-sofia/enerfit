@@ -98,7 +98,7 @@ def preprocess_historical_weather_data(data: pl.DataFrame) -> pl.DataFrame:
         data=data,
         column_names=[WeatherColumns.datetime],
         datetime_format="%Y-%m-%d %H:%M:%S",
-        timezone=pytz.timezone("Europe/Tallin"),
+        timezone=pytz.timezone("Europe/Tallinn"),
     )
     data = cast_column_to_32_bits_numeric(data)
     return cast_column_to_16_bits_numeric(data)

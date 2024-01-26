@@ -91,7 +91,7 @@ def preprocess_electricity_data(data: pl.DataFrame) -> pl.DataFrame:
         data=data,
         column_names=[ElectricityColumns.forecast_date, ElectricityColumns.origin_date],
         datetime_format="%Y-%m-%d %H:%M:%S",
-        timezone=pytz.timezone("Europe/Tallin"),
+        timezone=pytz.timezone("Europe/Tallinn"),
     )
     data = cast_column_to_32_bits_numeric(data)
     return cast_column_to_16_bits_numeric(data)

@@ -101,7 +101,7 @@ def cast_column_to_datetime(
         ...     'date1': ['2022-01-01', '2022-01-02'],
         ...     'date2': ['2022-01-03', '2022-01-04']
         ... })
-        >>> cast_column_to_datetime(data, 'date1', '%Y-%m-%d', pytz.timezone('Europe/Tallin'))
+        >>> cast_column_to_datetime(data, 'date1', '%Y-%m-%d', pytz.timezone('Europe/Tallinn'))
         pl.DataFrame({
             'date1': [datetime.datetime(2022, 1, 1), datetime.datetime(2022, 1, 2)],
             'date2': ['2022-01-03', '2022-01-04']
