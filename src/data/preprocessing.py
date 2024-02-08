@@ -447,28 +447,31 @@ def convert_objects_columns_to_category(dataset: pd.DataFrame) -> pd.DataFrame:
     return dataset
 
 
-def create_dataset(model_type: str, columns: list[str], add_noise_column: bool = True) -> pd.DataFrame:
-    """Creates a dataset for the specified model type with the given columns and an optional noise column.
+def create_dataset(
+    model_type: str, is_business: bool, columns: list[str], add_noise_column: bool = True
+) -> pd.DataFrame:
+    """Creates a dataset for training a machine learning model.
 
     Args:
-        model_type: A string representing the model type.
-        columns: A list of column names to include in the dataset.
-        add_noise_column: An optional boolean indicating whether to add a noise column. Default is True.
+        model_type (str): The type of model to train.
+        is_business (bool): Indicates whether the dataset is for business or non-business data.
+        columns (list[str]): The columns to include in the dataset.
+        add_noise_column (bool, optional): Whether to add a noise column to the dataset. Defaults to True.
 
     Returns:
-        The created dataset as a pandas DataFrame.
+        pd.DataFrame: The created dataset.
+
+    Raises:
+        None
 
     Examples:
-        >>> dataset = create_dataset("linear", ["feature1", "feature2"], add_noise_column=True)
-        >>> dataset.head()
-           feature1  feature2  noise
-        0         1         5   0.12
-        1         2         6  -0.34
-        2         3         7   0.56
-        3         4         8  -0.78
+        >>> create_dataset("linear", True, ["feature1", "feature2"], add_noise_column=True)
+        pd.DataFrame(...)
     """
     data = load_and_join_data()
-    data = data.filter(pl.col("is_consumption") == MAP_MODEL_TYPE.get(model_type, 0)).drop(["is_consumption"])
+    data = data.filter(
+        (pl.col("is_consumption") == MAP_MODEL_TYPE.get(model_type, 0)) & (pl.col("is_business") == int(is_business))
+    ).drop(["is_consumption", "is_business"])
     data = feature_engineer(data)
     data = data.drop_nulls()
 

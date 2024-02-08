@@ -273,11 +273,11 @@ def load_train(train_path: pathlib.Path) -> pl.LazyFrame:
         pl.col("data_block_id").cast(pl.Int16),
     )
     return train.with_columns(
-        pl.col("datetime").dt.year().alias("year"),
         pl.col("datetime").cast(pl.Date).alias("date"),
+        pl.col("datetime").dt.year().alias("year"),
         pl.col("datetime").dt.month().alias("month"),
-        pl.col("datetime").dt.weekday().alias("weekday"),
         pl.col("datetime").dt.day().alias("day"),
+        pl.col("datetime").dt.weekday().alias("weekday"),
         pl.col("datetime").dt.ordinal_day().alias("day_of_year"),
         pl.col("datetime").dt.hour().alias("hour"),
     )
