@@ -1,0 +1,68 @@
+[general]
+seed = 666
+
+[producer]
+[producer.business]
+learning_rate = 0.01
+num_leaves = 31
+max_depth = -1
+n_estimators = 10000
+subsample_for_bin = 200000
+objective = "poisson"
+subsample = 1.0
+colsample_bytree = 1.0
+n_jobs = -1
+linear_tree = true
+verbosity = 1
+device = "cpu"
+max_bin = 256
+columns = [ ]
+
+[producer.not_business]
+learning_rate = 0.01
+num_leaves = 20
+max_depth = -1
+n_estimators = 10000
+subsample_for_bin = 200000
+objective = "poisson"
+subsample = 1.0
+colsample_bytree = 1.0
+n_jobs = -1
+linear_tree = true
+verbosity = 1
+device = "cpu"
+max_bin = 256
+columns = [ ]
+
+[consumer]
+[consumer.business]
+learning_rate = 0.01
+num_leaves = 20
+max_depth = -1
+n_estimators = 10000
+subsample_for_bin = 200000
+objective = "poisson"
+subsample = 1.0
+colsample_bytree = 1.0
+n_jobs = -1
+linear_tree = true
+verbosity = 1
+device = "cpu"
+max_bin = 256
+columns = [ ]
+
+[consumer.not_business]
+learning_rate = 0.01
+num_leaves = 20
+max_depth = -1
+n_estimators = 10000
+subsample_for_bin = 200000
+objective = "poisson"
+subsample = 1.0
+colsample_bytree = 1.0
+n_jobs = -1
+linear_tree = true
+verbosity = 1
+device = "cpu"
+max_bin = 256
+columns = [ ]
