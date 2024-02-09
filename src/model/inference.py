@@ -20,17 +20,16 @@ def load_and_prepare_data_for_inference(
     start_date: datetime.date | None = None,
     end_date: datetime.date | None = None,
 ) -> pd.DataFrame:
-    """Load and prepare data for inference based on the given model type and business flag.
+    """Load and prepare data for inference based on the given model type, business flag, start date, and end date.
 
     Args:
-        model_type: The type of the model. Must be either 'producer' or 'consumer'.
+        model_type: The type of the model.
         is_business: Whether the data is for business or not. Defaults to True.
+        start_date: Optional start date to filter the data. Defaults to None.
+        end_date: Optional end date to filter the data. Defaults to None.
 
     Returns:
         pd.DataFrame: The prepared data for inference.
-
-    Raises:
-        ValueError: If the model type is not 'producer' or 'consumer'.
     """
     model_type: str = check_model_type(model_type)
 
@@ -55,7 +54,6 @@ def load_model(model_path: pathlib.Path) -> lgb.Booster | None:
 
     Args:
         model_path: The path to the LightGBM model file.
-        data: The input data for prediction.
 
     Returns:
         list | None: A list of predicted values if the model is successfully loaded, None otherwise.

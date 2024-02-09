@@ -7,6 +7,21 @@ DATE_FORMAT: str = "%Y-%m-%d"
 DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
 
+def add_data_block_id(dataframe: pl.LazyFrame) -> pl.LazyFrame:
+    """Add a data block ID column to the given lazy frame if it does not already exist.
+
+    Args:
+        dataframe: The input lazy frame.
+
+    Returns:
+        pl.LazyFrame: The lazy frame with the data block ID column added.
+    """
+    if "data_block_id" not in dataframe.columns:
+        dataframe = dataframe.with_columns(pl.lit(0).alias("data_block_id"))
+
+    return dataframe
+
+
 def load_clients(
     clients_path: pathlib.Path, start_date: datetime.date | None = None, end_date: datetime.date | None = None
 ) -> pl.LazyFrame:
@@ -22,6 +37,7 @@ def load_clients(
 
     """
     clients: pl.LazyFrame = pl.scan_csv(clients_path)
+    clients = add_data_block_id(clients)
     clients = clients.with_columns(
         [
             pl.col("product_type").cast(pl.Int8),
@@ -57,6 +73,7 @@ def load_electricity(
         pl.LazyFrame: A lazy frame containing the loaded electricity data.
     """
     electricity: pl.LazyFrame = pl.scan_csv(electricity_path).drop(["origin_date"])
+    electricity = add_data_block_id(electricity)
     electricity = electricity.with_columns(
         [
             pl.col("forecast_date").str.to_datetime(DATETIME_FORMAT) + pl.duration(days=1),
@@ -88,6 +105,7 @@ def load_gas(
         pl.LazyFrame: A lazy frame containing the loaded gas data.
     """
     gas: pl.LazyFrame = pl.scan_csv(gas_path).drop(["origin_date"])
+    gas = add_data_block_id(gas)
     gas = gas.with_columns(
         [
             pl.col("forecast_date").str.to_date(DATE_FORMAT),
@@ -171,6 +189,8 @@ def load_weather_forecast(
     weather_forecast: pl.LazyFrame = (
         pl.scan_csv(weather_forecast_path).drop(["origin_datetime"]).rename({"forecast_datetime": "datetime"})
     )
+
+    weather_forecast = add_data_block_id(weather_forecast)
     # weather_forecast = weather_forecast.filter(pl.col("hours_ahead") >= 24)  # we don't need to forecast for today
     weather_forecast = weather_forecast.with_columns(
         [
@@ -231,6 +251,9 @@ def load_historical_weather(
         pl.LazyFrame: A lazy frame containing the loaded historical weather data.
     """
     historical_weather: pl.LazyFrame = pl.scan_csv(historical_weather_path)
+
+    historical_weather = add_data_block_id(historical_weather)
+
     historical_weather = historical_weather.with_columns(
         [
             pl.col("datetime").str.to_datetime(DATETIME_FORMAT),
@@ -294,6 +317,8 @@ def load_train(
         pl.LazyFrame: A lazy frame containing the loaded training data.
     """
     train: pl.LazyFrame = pl.scan_csv(train_path)
+
+    train = add_data_block_id(train)
 
     train = train.drop(["prediction_unit_id", "row_id"]).with_columns(
         pl.col("datetime").str.to_datetime(DATETIME_FORMAT),
