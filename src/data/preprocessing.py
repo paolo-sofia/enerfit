@@ -1,3 +1,4 @@
+import datetime
 import pathlib
 from typing import Any
 
@@ -185,37 +186,49 @@ def add_clients_id(data: pl.LazyFrame) -> pl.LazyFrame:
     )
 
 
-def load_data() -> tuple[pl.LazyFrame, ...]:
+def load_data(
+    start_date: datetime.date | None = None, end_date: datetime.date | None = None
+) -> tuple[pl.LazyFrame, ...]:
     """Loads and returns multiple data sources as LazyFrames.
 
     Returns:
         A tuple of LazyFrames containing the loaded data from various sources.
     """
-    paths: dict[str, str] = data_config.get("paths", {})
     root_dir: pathlib.Path = get_root_path()
+    paths: dict[str, str] = data_config.get("paths", {})
+
     paths: dict[str, pathlib.Path] = {name: root_dir / path for name, path in paths.items()}
 
-    train_data: pl.LazyFrame = load_train(pathlib.Path(paths.get("train")))
-    gas_data: pl.LazyFrame = load_gas(pathlib.Path(paths.get("gas")))
-    electricity_data: pl.LazyFrame = load_electricity(pathlib.Path(paths.get("electricity")))
-    clients_data: pl.LazyFrame = load_clients(pathlib.Path(paths.get("clients")))
+    train_data: pl.LazyFrame = load_train(pathlib.Path(paths.get("train")), start_date=start_date, end_date=end_date)
+    gas_data: pl.LazyFrame = load_gas(pathlib.Path(paths.get("gas")), start_date=start_date, end_date=end_date)
+    electricity_data: pl.LazyFrame = load_electricity(
+        pathlib.Path(paths.get("electricity")), start_date=start_date, end_date=end_date
+    )
+    clients_data: pl.LazyFrame = load_clients(
+        pathlib.Path(paths.get("clients")), start_date=start_date, end_date=end_date
+    )
     weather_county_map: pl.LazyFrame = load_weather_station_mapping(pathlib.Path(paths.get("weather_station_map")))
     weather_forecast_data: pl.LazyFrame = load_weather_forecast(
-        weather_county_map, pathlib.Path(paths.get("weather_forecast"))
+        weather_county_map, pathlib.Path(paths.get("weather_forecast"), start_date=start_date, end_date=end_date)
     )
     historical_weather_data: pl.LazyFrame = load_historical_weather(
-        weather_county_map, pathlib.Path(paths.get("historical_weather"))
+        weather_county_map, pathlib.Path(paths.get("historical_weather"), start_date=start_date, end_date=end_date)
     )
     return train_data, gas_data, electricity_data, clients_data, weather_forecast_data, historical_weather_data
 
 
-def load_and_join_data() -> pl.LazyFrame:
+def load_and_join_data(
+    start_date: datetime.date | None = None,
+    end_date: datetime.date | None = None,
+) -> pl.LazyFrame:
     """Loads and joins multiple data sources to create a LazyFrame containing the combined data.
 
     Returns:
         The LazyFrame with the loaded and joined data.
     """
-    train_data, gas_data, electricity_data, clients_data, weather_forecast_data, historical_weather_data = load_data()
+    train_data, gas_data, electricity_data, clients_data, weather_forecast_data, historical_weather_data = load_data(
+        start_date=start_date, end_date=end_date
+    )
 
     data: pl.LazyFrame = (
         train_data.join(
@@ -448,27 +461,35 @@ def convert_objects_columns_to_category(dataset: pd.DataFrame) -> pd.DataFrame:
 
 
 def create_dataset(
-    model_type: str, is_business: bool, columns: list[str], add_noise_column: bool = True
+    model_type: str,
+    is_business: bool,
+    columns: list[str],
+    dataset_type: str = "train",
+    add_noise_column: bool = True,
+    start_date: datetime.date | None = None,
+    end_date: datetime.date | None = None,
 ) -> pd.DataFrame:
-    """Creates a dataset for training a machine learning model.
+    """Create a dataset for training or inference based on the given model type, business flag, columns, dataset type, start date, and end date.
 
     Args:
-        model_type (str): The type of model to train.
-        is_business (bool): Indicates whether the dataset is for business or non-business data.
-        columns (list[str]): The columns to include in the dataset.
-        add_noise_column (bool, optional): Whether to add a noise column to the dataset. Defaults to True.
+        model_type: The type of the model.
+        is_business: Whether the data is for business or not.
+        columns: List of column names to include in the dataset.
+        dataset_type: The type of the dataset. Must be either 'train' or 'inference'. Defaults to 'train'.
+        add_noise_column: Whether to add a noise column for training. Defaults to True.
+        start_date: Optional start date to filter the data. Defaults to None.
+        end_date: Optional end date to filter the data. Defaults to None.
 
     Returns:
         pd.DataFrame: The created dataset.
 
     Raises:
-        None
-
-    Examples:
-        >>> create_dataset("linear", True, ["feature1", "feature2"], add_noise_column=True)
-        pd.DataFrame(...)
+        ValueError: If the dataset type is not 'train' or 'inference'.
     """
-    data = load_and_join_data()
+    if dataset_type not in ["train", "inference"]:
+        raise ValueError(f"dataset type must be either 'train' or 'inference', given: {dataset_type}")
+
+    data = load_and_join_data(start_date=start_date, end_date=end_date)
     data = data.filter(
         (pl.col("is_consumption") == MAP_MODEL_TYPE.get(model_type, 0)) & (pl.col("is_business") == int(is_business))
     ).drop(["is_consumption", "is_business"])
@@ -478,5 +499,9 @@ def create_dataset(
     if columns:
         data = data.select(columns)
 
-    data = add_noise_feature_for_training(data).to_pandas() if add_noise_column else data.collect().to_pandas()
+    if add_noise_column and dataset_type == "train":
+        data = add_noise_feature_for_training(data).to_pandas()
+    else:
+        data.collect().to_pandas()
+
     return convert_objects_columns_to_category(data)

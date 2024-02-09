@@ -1,3 +1,4 @@
+import datetime
 import pathlib
 
 import polars as pl
@@ -6,22 +7,22 @@ DATE_FORMAT: str = "%Y-%m-%d"
 DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
 
-def load_clients(clients_path: pathlib.Path) -> pl.LazyFrame:
-    """Load the clients data from a CSV file and perform column type conversions.
+def load_clients(
+    clients_path: pathlib.Path, start_date: datetime.date | None = None, end_date: datetime.date | None = None
+) -> pl.LazyFrame:
+    """Load client data from the given CSV file path and apply optional filters based on start and end dates.
 
     Args:
-        clients_path (pathlib.Path): The path to the clients CSV file.
+        clients_path: The path to the CSV file containing client data.
+        start_date: Optional start date to filter the data. Defaults to None.
+        end_date: Optional end date to filter the data. Defaults to None.
 
     Returns:
-        pl.LazyFrame: A lazy frame containing the loaded clients data with converted column types.
+        pl.LazyFrame: A lazy frame containing the loaded client data.
 
-    Examples:
-        >>> clients_path = pathlib.Path("clients.csv")
-        >>> clients_data = load_clients(clients_path)
-        >>> # Perform operations on the loaded clients data
     """
     clients: pl.LazyFrame = pl.scan_csv(clients_path)
-    return clients.with_columns(
+    clients = clients.with_columns(
         [
             pl.col("product_type").cast(pl.Int8),
             pl.col("county").cast(pl.Int8),
@@ -33,23 +34,30 @@ def load_clients(clients_path: pathlib.Path) -> pl.LazyFrame:
         ]
     )
 
+    if start_date and isinstance(start_date, datetime.date):
+        clients = clients.filter(pl.col("date") >= start_date)
 
-def load_electricity(electricity_path: pathlib.Path) -> pl.LazyFrame:
-    """Load the electricity data from a CSV file and perform column type conversions.
+    if end_date and isinstance(end_date, datetime.date):
+        clients = clients.filter(pl.col("date") <= end_date)
+
+    return clients
+
+
+def load_electricity(
+    electricity_path: pathlib.Path, start_date: datetime.date | None = None, end_date: datetime.date | None = None
+) -> pl.LazyFrame:
+    """Load electricity data from the given CSV file path and apply optional filters based on start and end dates.
 
     Args:
-        electricity_path (pathlib.Path): The path to the electricity CSV file.
+        electricity_path: The path to the CSV file containing electricity data.
+        start_date: Optional start date to filter the data. Defaults to None.
+        end_date: Optional end date to filter the data. Defaults to None.
 
     Returns:
-        pl.LazyFrame: A lazy frame containing the loaded electricity data with converted column types.
-
-    Examples:
-        >>> electricity_path = pathlib.Path("electricity.csv")
-        >>> electricity_data = load_electricity(electricity_path)
-        >>> # Perform operations on the loaded electricity data
+        pl.LazyFrame: A lazy frame containing the loaded electricity data.
     """
     electricity: pl.LazyFrame = pl.scan_csv(electricity_path).drop(["origin_date"])
-    return electricity.with_columns(
+    electricity = electricity.with_columns(
         [
             pl.col("forecast_date").str.to_datetime(DATETIME_FORMAT) + pl.duration(days=1),
             pl.col("euros_per_mwh").cast(pl.Float32),
@@ -57,23 +65,30 @@ def load_electricity(electricity_path: pathlib.Path) -> pl.LazyFrame:
         ]
     ).rename({"forecast_date": "datetime", "euros_per_mwh": "electricity_euros_per_mwh"})
 
+    if start_date and isinstance(start_date, datetime.date):
+        electricity = electricity.filter(pl.col("datetime") >= start_date)
 
-def load_gas(gas_path: pathlib.Path) -> pl.LazyFrame:
-    """Load the gas data from a CSV file and perform column type conversions.
+    if end_date and isinstance(end_date, datetime.date):
+        electricity = electricity.filter(pl.col("datetime") <= end_date)
+
+    return electricity
+
+
+def load_gas(
+    gas_path: pathlib.Path, start_date: datetime.date | None = None, end_date: datetime.date | None = None
+) -> pl.LazyFrame:
+    """Load gas data from the given CSV file path and apply optional filters based on start and end dates.
 
     Args:
-        gas_path (pathlib.Path): The path to the gas CSV file.
+        gas_path: The path to the CSV file containing gas data.
+        start_date: Optional start date to filter the data. Defaults to None.
+        end_date: Optional end date to filter the data. Defaults to None.
 
     Returns:
-        pl.LazyFrame: A lazy frame containing the loaded gas data with converted column types.
-
-    Examples:
-        >>> gas_path = pathlib.Path("gas.csv")
-        >>> gas_data = load_gas(gas_path)
-        >>> # Perform operations on the loaded gas data
+        pl.LazyFrame: A lazy frame containing the loaded gas data.
     """
     gas: pl.LazyFrame = pl.scan_csv(gas_path).drop(["origin_date"])
-    return gas.with_columns(
+    gas = gas.with_columns(
         [
             pl.col("forecast_date").str.to_date(DATE_FORMAT),
             pl.col("lowest_price_per_mwh").cast(pl.Float32),
@@ -88,6 +103,14 @@ def load_gas(gas_path: pathlib.Path) -> pl.LazyFrame:
             "highest_price_per_mwh": "gas_highest_price_per_mwh",
         }
     )
+
+    if start_date and isinstance(start_date, datetime.date):
+        gas = gas.filter(pl.col("date") >= start_date)
+
+    if end_date and isinstance(end_date, datetime.date):
+        gas = gas.filter(pl.col("date") <= end_date)
+
+    return gas
 
 
 def load_weather_station_mapping(weather_station_county_map_path: pathlib.Path) -> pl.LazyFrame:
@@ -129,22 +152,21 @@ def load_weather_station_mapping(weather_station_county_map_path: pathlib.Path) 
 
 
 def load_weather_forecast(
-    weather_station_county_mapping: pl.LazyFrame, weather_forecast_path: pathlib.Path
+    weather_station_county_mapping: pl.LazyFrame,
+    weather_forecast_path: pathlib.Path,
+    start_date: datetime.date | None = None,
+    end_date: datetime.date | None = None,
 ) -> pl.LazyFrame:
-    """Load the weather forecast data from a CSV file and perform data transformations.
+    """Load weather forecast data from the given CSV file path and apply optional filters based on start and end dates.
 
     Args:
-        weather_station_county_mapping (pl.LazyFrame): The weather station to county mapping data.
-        weather_forecast_path (pathlib.Path): The path to the weather forecast CSV file.
+        weather_station_county_mapping: A lazy frame containing the mapping between weather stations and counties.
+        weather_forecast_path: The path to the CSV file containing weather forecast data.
+        start_date: Optional start date to filter the data. Defaults to None.
+        end_date: Optional end date to filter the data. Defaults to None.
 
     Returns:
-        pl.LazyFrame: A lazy frame containing the loaded weather forecast data with transformed columns.
-
-    Examples:
-        >>> weather_station_county_mapping = load_weather_station_mapping(weather_station_county_map_path)
-        >>> weather_forecast_path = pathlib.Path("weather_forecast.csv")
-        >>> weather_forecast_data = load_weather_forecast(weather_station_county_mapping, weather_forecast_path)
-        >>> # Perform operations on the loaded weather forecast data
+        pl.LazyFrame: A lazy frame containing the loaded weather forecast data.
     """
     weather_forecast: pl.LazyFrame = (
         pl.scan_csv(weather_forecast_path).drop(["origin_datetime"]).rename({"forecast_datetime": "datetime"})
@@ -158,6 +180,12 @@ def load_weather_forecast(
             pl.col("data_block_id").cast(pl.Int16),
         ]
     )
+
+    if start_date and isinstance(start_date, datetime.date):
+        weather_forecast = weather_forecast.filter(pl.col("datetime") >= start_date)
+
+    if end_date and isinstance(end_date, datetime.date):
+        weather_forecast = weather_forecast.filter(pl.col("datetime") <= end_date)
 
     weather_forecast = weather_forecast.join(
         other=weather_station_county_mapping, how="left", on=["latitude", "longitude"]
@@ -186,22 +214,21 @@ def load_weather_forecast(
 
 
 def load_historical_weather(
-    weather_station_county_mapping: pl.LazyFrame, historical_weather_path: pathlib.Path
+    weather_station_county_mapping: pl.LazyFrame,
+    historical_weather_path: pathlib.Path,
+    start_date: datetime.date | None = None,
+    end_date: datetime.date | None = None,
 ) -> pl.LazyFrame:
-    """Load the historical weather data from a CSV file and perform data transformations.
+    """Load historical weather data from the given CSV file path and apply optional filters based on start and end dates.
 
     Args:
-        weather_station_county_mapping (pl.LazyFrame): The weather station to county mapping data.
-        historical_weather_path (pathlib.Path): The path to the historical weather CSV file.
+        weather_station_county_mapping: A lazy frame containing the mapping between weather stations and counties.
+        historical_weather_path: The path to the CSV file containing historical weather data.
+        start_date: Optional start date to filter the data. Defaults to None.
+        end_date: Optional end date to filter the data. Defaults to None.
 
     Returns:
-        pl.LazyFrame: A lazy frame containing the loaded historical weather data with transformed columns.
-
-    Examples:
-        >>> weather_station_county_mapping = load_weather_station_mapping(weather_station_county_map_path)
-        >>> historical_weather_path = pathlib.Path("historical_weather.csv")
-        >>> historical_weather_data = load_historical_weather(weather_station_county_mapping, historical_weather_path)
-        >>> # Perform operations on the loaded historical weather data
+        pl.LazyFrame: A lazy frame containing the loaded historical weather data.
     """
     historical_weather: pl.LazyFrame = pl.scan_csv(historical_weather_path)
     historical_weather = historical_weather.with_columns(
@@ -212,6 +239,12 @@ def load_historical_weather(
             pl.col("data_block_id").cast(pl.Int16),
         ]
     )
+
+    if start_date and isinstance(start_date, datetime.date):
+        historical_weather = historical_weather.filter(pl.col("datetime") >= start_date)
+
+    if end_date and isinstance(end_date, datetime.date):
+        historical_weather = historical_weather.filter(pl.col("datetime") <= end_date)
 
     historical_weather = historical_weather.join(
         other=weather_station_county_mapping, how="left", on=["latitude", "longitude"]
@@ -247,19 +280,18 @@ def load_historical_weather(
     )
 
 
-def load_train(train_path: pathlib.Path) -> pl.LazyFrame:
-    """Load the training data from a CSV file and perform data transformations.
+def load_train(
+    train_path: pathlib.Path, start_date: datetime.date | None = None, end_date: datetime.date | None = None
+) -> pl.LazyFrame:
+    """Load training data from the given CSV file path and apply optional filters based on start and end dates.
 
     Args:
-        train_path (pathlib.Path): The path to the training data CSV file.
+        train_path: The path to the CSV file containing training data.
+        start_date: Optional start date to filter the data. Defaults to None.
+        end_date: Optional end date to filter the data. Defaults to None.
 
     Returns:
-        pl.LazyFrame: A lazy frame containing the loaded training data with transformed columns.
-
-    Examples:
-        >>> train_path = pathlib.Path("train.csv")
-        >>> train_data = load_train(train_path)
-        >>> # Perform operations on the loaded training data
+        pl.LazyFrame: A lazy frame containing the loaded training data.
     """
     train: pl.LazyFrame = pl.scan_csv(train_path)
 
@@ -272,6 +304,13 @@ def load_train(train_path: pathlib.Path) -> pl.LazyFrame:
         pl.col("county").cast(pl.Int8),
         pl.col("data_block_id").cast(pl.Int16),
     )
+
+    if start_date and isinstance(start_date, datetime.date):
+        train = train.filter(pl.col("datetime") >= start_date)
+
+    if end_date and isinstance(end_date, datetime.date):
+        train = train.filter(pl.col("datetime") <= end_date)
+
     return train.with_columns(
         pl.col("datetime").cast(pl.Date).alias("date"),
         pl.col("datetime").dt.year().alias("year"),
