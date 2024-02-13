@@ -6,7 +6,8 @@ from dagster_polars.io_managers import PolarsParquetIOManager
 from .assets import data_loader_assets
 from .resources.data_path_resource import DataPathResource
 from .resources.model_dataset_config_resource import ModelDatasetConfigResource
-from .utils.configs import load_data_preprocessing_config
+from .resources.model_parameters_resource import ModelParametersResource
+from .utils.configs import load_data_preprocessing_config, load_model_config
 
 # set the data directory
 BASE_DATA_DIR: pathlib.Path = pathlib.Path("../data")
@@ -14,6 +15,8 @@ BASE_DATA_DIR: pathlib.Path = pathlib.Path("../data")
 # get configs
 config = load_data_preprocessing_config()
 config["paths"] = {k: str(BASE_DATA_DIR / v) for k, v in config["paths"].items()}
+
+model_config = load_model_config()
 
 
 # load assets
@@ -38,5 +41,10 @@ defs = Definitions(
         "polars_parquet_io_manager": polars_parquet_manager,
         "data_path_resource": DataPathResource(**config["paths"]),
         "model_data_resource": ModelDatasetConfigResource(**config.get("preprocessing", {})),
+        "model_config": ModelParametersResource(
+            seed=model_config.get("seed", 42),
+            producer_parameters=model_config.get("producer", {}),
+            consumer_parameters=model_config.get("consumer", {}),
+        ),
     },
 )

@@ -11,7 +11,6 @@ from dagster_etl.resources.model_dataset_config_resource import ModelDatasetConf
 from dagster_etl.utils.configs import load_data_preprocessing_config
 from dagster_etl.utils.preprocessing import get_start_and_end_date_from_config
 
-MAP_MODEL_TYPE: dict[str, int] = {"producer": 0, "consumer": 1}
 ESTONIAN_HOLIDAYS = list(holidays.country_holidays("EE", years=range(2021, 2026)).keys())
 
 data_config: dict[str, Any] = load_data_preprocessing_config()
