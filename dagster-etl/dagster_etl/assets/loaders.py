@@ -89,37 +89,32 @@ def load_electricity(data_path_resource: DataPathResource) -> pl.LazyFrame:
     ).rename({"forecast_date": "datetime", "euros_per_mwh": "electricity_euros_per_mwh"})
 
 
-#
-# @asset(name="gas")
-# def load_gas(data_path_resource: DataPathResource) -> pl.LazyFrame:
-#     """Load gas data from the given CSV file path and apply optional filters based on start and end dates.
-#
-#     Args:
-#         gas_path: The path to the CSV file containing gas data.
-#
-#     Returns:
-#         pl.LazyFrame: A lazy frame containing the loaded gas data.
-#     """
-#     gas: pl.LazyFrame = pl.scan_csv(gas_path).drop(["origin_date"])
-#     gas = add_data_block_id(gas)
-#     gas = gas.with_columns(
-#         [
-#             pl.col("forecast_date").str.to_date(DATE_FORMAT),
-#             pl.col("lowest_price_per_mwh").cast(pl.Float32),
-#             pl.col("highest_price_per_mwh").cast(pl.Float32),
-#             ((pl.col("lowest_price_per_mwh") + pl.col("highest_price_per_mwh")) / 2).alias("gas_mean_price_per_mhw"),
-#             pl.col("data_block_id").cast(pl.Int16),
-#         ]
-#     ).rename(
-#         {
-#             "forecast_date": "date",
-#             "lowest_price_per_mwh": "gas_lowest_price_per_mwh",
-#             "highest_price_per_mwh": "gas_highest_price_per_mwh",
-#         }
-#     )
-#
-#     return gas
-#
+@asset(
+    name="gas",
+    io_manager_key="polars_parquet_io_manager",
+    key_prefix=["raw", "gas"],
+    compute_kind="polars",
+)
+def load_gas(data_path_resource: DataPathResource) -> pl.LazyFrame:
+    gas: pl.LazyFrame = pl.scan_csv(data_path_resource.gas).drop(["origin_date"])
+    gas = add_data_block_id(gas)
+    return gas.with_columns(
+        [
+            pl.col("forecast_date").str.to_date(DATE_FORMAT),
+            pl.col("lowest_price_per_mwh").cast(pl.Float32),
+            pl.col("highest_price_per_mwh").cast(pl.Float32),
+            ((pl.col("lowest_price_per_mwh") + pl.col("highest_price_per_mwh")) / 2).alias("gas_mean_price_per_mhw"),
+            pl.col("data_block_id").cast(pl.Int16),
+        ]
+    ).rename(
+        {
+            "forecast_date": "date",
+            "lowest_price_per_mwh": "gas_lowest_price_per_mwh",
+            "highest_price_per_mwh": "gas_highest_price_per_mwh",
+        }
+    )
+
+
 #
 # @asset(name="weather_station_county_mapping")
 # def load_weather_station_mapping(weather_station_county_map_path: pathlib.Path) -> pl.LazyFrame:
