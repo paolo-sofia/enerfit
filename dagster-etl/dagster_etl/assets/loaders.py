@@ -115,46 +115,50 @@ def load_gas(data_path_resource: DataPathResource) -> pl.LazyFrame:
     )
 
 
-#
-# @asset(name="weather_station_county_mapping")
-# def load_weather_station_mapping(weather_station_county_map_path: pathlib.Path) -> pl.LazyFrame:
-#     """Load the weather station to county mapping data from a CSV file and perform data transformations.
-#
-#     Args:
-#         weather_station_county_map_path (pathlib.Path): The path to the weather station to county mapping CSV file.
-#
-#     Returns:
-#         pl.LazyFrame: A lazy frame containing the loaded weather station to county mapping data.
-#
-#     Examples:
-#         >>> weather_station_county_map_path = pathlib.Path("weather_station_mapping.csv")
-#         >>> weather_station_mapping_data = load_weather_station_mapping(weather_station_county_map_path)
-#         >>> # Perform operations on the loaded weather station mapping data
-#     """
-#     weather_station_county_mapping: pl.LazyFrame = pl.scan_csv(weather_station_county_map_path)
-#     weather_station_county_mapping = weather_station_county_mapping.with_columns(
-#         [
-#             pl.col("longitude").cast(pl.Float32).round(decimals=2),
-#             pl.col("latitude").cast(pl.Float32).round(decimals=2),
-#             pl.col("county").cast(pl.Int8).fill_null(-1),
-#             pl.col("county_name").fill_null("Unknown"),
-#         ]
-#     )
-#
-#     return weather_station_county_mapping.join(
-#         other=weather_station_county_mapping.group_by("county").agg(
-#             [
-#                 pl.col("longitude").min().alias("longitude_min"),
-#                 pl.col("longitude").max().alias("longitude_max"),
-#                 pl.col("latitude").min().alias("latitude_min"),
-#                 pl.col("latitude").max().alias("latitude_max"),
-#             ]
-#         ),
-#         on=["county"],
-#         how="inner",
-#     )
-#
-#
+@asset(
+    name="weather_station_county_mapping",
+    io_manager_key="polars_parquet_io_manager",
+    key_prefix=["raw"],
+    compute_kind="polars",
+)
+def load_weather_station_mapping(data_path_resource: DataPathResource) -> pl.DataFrame:
+    """Load the weather station to county mapping data from a CSV file and perform data transformations.
+
+    Args:
+        weather_station_county_map_path (pathlib.Path): The path to the weather station to county mapping CSV file.
+
+    Returns:
+        pl.LazyFrame: A lazy frame containing the loaded weather station to county mapping data.
+
+    Examples:
+        >>> weather_station_county_map_path = pathlib.Path("weather_station_mapping.csv")
+        >>> weather_station_mapping_data = load_weather_station_mapping(weather_station_county_map_path)
+        >>> # Perform operations on the loaded weather station mapping data
+    """
+    weather_station_county_mapping: pl.LazyFrame = pl.scan_csv(data_path_resource.weather_station_map)
+    weather_station_county_mapping = weather_station_county_mapping.with_columns(
+        [
+            pl.col("longitude").cast(pl.Float32).round(decimals=2),
+            pl.col("latitude").cast(pl.Float32).round(decimals=2),
+            pl.col("county").cast(pl.Int8).fill_null(-1),
+            pl.col("county_name").fill_null("Unknown"),
+        ]
+    )
+
+    return weather_station_county_mapping.join(
+        other=weather_station_county_mapping.group_by("county").agg(
+            [
+                pl.col("longitude").min().alias("longitude_min"),
+                pl.col("longitude").max().alias("longitude_max"),
+                pl.col("latitude").min().alias("latitude_min"),
+                pl.col("latitude").max().alias("latitude_max"),
+            ]
+        ),
+        on=["county"],
+        how="inner",
+    ).collect()
+
+
 # @asset(name="weather_forecast")
 # def load_weather_forecast(
 #     weather_station_county_mapping: pl.LazyFrame, weather_forecast_path: pathlib.Path
