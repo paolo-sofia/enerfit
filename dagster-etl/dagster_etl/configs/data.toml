@@ -1,0 +1,12 @@
+[paths]
+train  = "raw/train/train.csv"
+gas  = "raw/gas/gas_prices.csv"
+electricity  = "raw/electricity/electricity_prices.csv"
+clients  = "raw/clients/client.csv"
+weather_station_map  = "raw/weather_station_to_county_mapping.csv"
+weather_forecast  = "raw/weather_forecast/forecast_weather.csv"
+historical_weather  = "raw/historical_weather/historical_weather.csv"
+
+[preprocessing]
+offset_hours = 11
+lag_days = 7

@@ -4,7 +4,7 @@ from typing import Any
 import tomllib
 
 MODEL_PARAMETER_PATH: pathlib.Path = pathlib.Path("src/configs/models_parameter.toml")
-DATA_PREPROCESSING_PATH: pathlib.Path = pathlib.Path("src/configs/data.toml")
+DATA_PREPROCESSING_PATH: pathlib.Path = pathlib.Path("dagster-etl/dagster_etl/configs/data.toml")
 
 
 def get_root_path() -> pathlib.Path:
