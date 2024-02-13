@@ -1,15 +1,17 @@
-import os
+import datetime
 
 import polars as pl
+import pytz
 from dagster import asset
 
 from ..resources.data_path_resource import DataPathResource
 
-print("PORCODIO\n\n\n\n\n\n\n\n", os.getcwd())
-
-
 DATE_FORMAT: str = "%Y-%m-%d"
 DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
+today: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Rome")).today()
+year: str = str(today.year)
+month: str = str(today.month)
+day: str = str(today.day)
 
 
 def add_data_block_id(dataframe: pl.LazyFrame) -> pl.LazyFrame:
@@ -30,7 +32,7 @@ def add_data_block_id(dataframe: pl.LazyFrame) -> pl.LazyFrame:
 @asset(
     name="clients",
     io_manager_key="polars_parquet_io_manager",
-    key_prefix=["raw", "clients"],
+    key_prefix=["raw", "clients", year, month, day],
     compute_kind="polars",
 )
 def load_clients(data_path_resource: DataPathResource) -> pl.LazyFrame:
@@ -40,7 +42,7 @@ def load_clients(data_path_resource: DataPathResource) -> pl.LazyFrame:
     and returns a lazy frame containing the transformed client data.
 
     Args:
-        data_path_resource: The data path resource representing the location of the client data.
+        data_path_resource (DataPathResource): The data path resource representing the location of the client data.
 
     Returns:
         pl.LazyFrame: A lazy frame containing the transformed client data.
@@ -63,7 +65,7 @@ def load_clients(data_path_resource: DataPathResource) -> pl.LazyFrame:
 @asset(
     name="electricity",
     io_manager_key="polars_parquet_io_manager",
-    key_prefix=["raw", "electricity"],
+    key_prefix=["raw", "electricity", year, month, day],
     compute_kind="polars",
 )
 def load_electricity(data_path_resource: DataPathResource) -> pl.LazyFrame:
@@ -73,7 +75,7 @@ def load_electricity(data_path_resource: DataPathResource) -> pl.LazyFrame:
     and returns a lazy frame containing the transformed electricity data.
 
     Args:
-        data_path_resource: The data path resource representing the location of the electricity data.
+        data_path_resource (DataPathResource): The data path resource representing the location of the client data.
 
     Returns:
         pl.LazyFrame: A lazy frame containing the transformed electricity data.
@@ -92,7 +94,7 @@ def load_electricity(data_path_resource: DataPathResource) -> pl.LazyFrame:
 @asset(
     name="gas",
     io_manager_key="polars_parquet_io_manager",
-    key_prefix=["raw", "gas"],
+    key_prefix=["raw", "gas", year, month, day],
     compute_kind="polars",
 )
 def load_gas(data_path_resource: DataPathResource) -> pl.LazyFrame:
@@ -125,7 +127,7 @@ def load_weather_station_mapping(data_path_resource: DataPathResource) -> pl.Dat
     """Load the weather station to county mapping data from a CSV file and perform data transformations.
 
     Args:
-        weather_station_county_map_path (pathlib.Path): The path to the weather station to county mapping CSV file.
+        data_path_resource (DataPathResource): The data path resource representing the location of the client data.
 
     Returns:
         pl.LazyFrame: A lazy frame containing the loaded weather station to county mapping data.
@@ -162,7 +164,7 @@ def load_weather_station_mapping(data_path_resource: DataPathResource) -> pl.Dat
 @asset(
     name="weather_forecast",
     io_manager_key="polars_parquet_io_manager",
-    key_prefix=["raw", "weather_forecast"],
+    key_prefix=["raw", "weather_forecast", year, month, day],
     compute_kind="polars",
 )
 def load_weather_forecast(
@@ -171,8 +173,9 @@ def load_weather_forecast(
     """Load weather forecast data from the given CSV file path and apply optional filters based on start and end dates.
 
     Args:
-        weather_station_county_mapping: A lazy frame containing the mapping between weather stations and counties.
-        weather_forecast_path: The path to the CSV file containing weather forecast data.
+        weather_station_county_mapping (pl.LazyFrame): A lazy frame containing the mapping between weather stations
+            and counties.
+        data_path_resource (DataPathResource): The data path resource representing the location of the client data.
 
     Returns:
         pl.LazyFrame: A lazy frame containing the loaded weather forecast data.
@@ -227,17 +230,16 @@ def load_weather_forecast(
 @asset(
     name="historical_weather",
     io_manager_key="polars_parquet_io_manager",
-    key_prefix=["raw", "historical_weather"],
+    key_prefix=["raw", "historical_weather", year, month, day],
     compute_kind="polars",
 )
 def load_historical_weather(
     weather_station_county_mapping: pl.LazyFrame, data_path_resource: DataPathResource
 ) -> pl.DataFrame:
-    """Load historical weather data from the given CSV file path and apply optional filters based on start and end dates.
+    """Load and preprocess historical weather data from the given CSV file.
 
     Args:
-        weather_station_county_mapping: A lazy frame containing the mapping between weather stations and counties.
-        historical_weather_path: The path to the CSV file containing historical weather data.
+        data_path_resource (DataPathResource): The data path resource representing the location of the client data.
 
     Returns:
         pl.LazyFrame: A lazy frame containing the loaded historical weather data.
@@ -292,14 +294,14 @@ def load_historical_weather(
 @asset(
     name="train",
     io_manager_key="polars_parquet_io_manager",
-    key_prefix=["raw", "train"],
+    key_prefix=["raw", "train", year, month, day],
     compute_kind="polars",
 )
 def load_train(data_path_resource: DataPathResource) -> pl.LazyFrame:
     """Load training data from the given CSV file path and apply optional filters based on start and end dates.
 
     Args:
-        train_path: The path to the CSV file containing training data.
+        data_path_resource (DataPathResource): The data path resource representing the location of the client data.
 
     Returns:
         pl.LazyFrame: A lazy frame containing the loaded training data.
