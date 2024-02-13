@@ -8,5 +8,9 @@ weather_forecast  = "raw/weather_forecast/forecast_weather.csv"
 historical_weather  = "raw/historical_weather/historical_weather.csv"
 
 [preprocessing]
+train_months = 6
+test_months = 3
 offset_hours = 11
 lag_days = 7
+add_noise_columns = true
+
