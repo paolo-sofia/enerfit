@@ -159,59 +159,71 @@ def load_weather_station_mapping(data_path_resource: DataPathResource) -> pl.Dat
     ).collect()
 
 
-# @asset(name="weather_forecast")
-# def load_weather_forecast(
-#     weather_station_county_mapping: pl.LazyFrame, weather_forecast_path: pathlib.Path
-# ) -> pl.LazyFrame:
-#     """Load weather forecast data from the given CSV file path and apply optional filters based on start and end dates.
-#
-#     Args:
-#         weather_station_county_mapping: A lazy frame containing the mapping between weather stations and counties.
-#         weather_forecast_path: The path to the CSV file containing weather forecast data.
-#
-#     Returns:
-#         pl.LazyFrame: A lazy frame containing the loaded weather forecast data.
-#     """
-#     weather_forecast: pl.LazyFrame = (
-#         pl.scan_csv(weather_forecast_path).drop(["origin_datetime"]).rename({"forecast_datetime": "datetime"})
-#     )
-#
-#     weather_forecast = add_data_block_id(weather_forecast)
-#     # weather_forecast = weather_forecast.filter(pl.col("hours_ahead") >= 24)  # we don't need to forecast for today
-#     weather_forecast = weather_forecast.with_columns(
-#         [
-#             pl.col("datetime").str.to_datetime(DATETIME_FORMAT),
-#             pl.col("latitude").cast(pl.Float32).round(decimals=2),
-#             pl.col("longitude").cast(pl.Float32).round(decimals=2),
-#             pl.col("data_block_id").cast(pl.Int16),
-#         ]
-#     )
-#
-#     weather_forecast = weather_forecast.join(
-#         other=weather_station_county_mapping, how="left", on=["latitude", "longitude"]
-#     ).drop(["latitude", "longitude"])
-#
-#     return weather_forecast.group_by("county", "datetime", "data_block_id").agg(
-#         pl.col("hours_ahead").mean(),
-#         pl.col("temperature").mean(),
-#         pl.col("dewpoint").mean(),
-#         pl.col("cloudcover_high").mean(),
-#         pl.col("cloudcover_low").mean(),
-#         pl.col("cloudcover_mid").mean(),
-#         pl.col("cloudcover_total").mean(),
-#         pl.col("10_metre_u_wind_component").mean(),
-#         pl.col("10_metre_v_wind_component").mean(),
-#         pl.col("direct_solar_radiation").mean(),
-#         pl.col("surface_solar_radiation_downwards").mean(),
-#         pl.col("snowfall").mean(),
-#         pl.col("total_precipitation").mean(),
-#         pl.col("latitude_min").first(),
-#         pl.col("latitude_max").first(),
-#         pl.col("longitude_min").first(),
-#         pl.col("longitude_max").first(),
-#         pl.col("county_name").first(),
-#     )
-#
+@asset(
+    name="weather_forecast",
+    io_manager_key="polars_parquet_io_manager",
+    key_prefix=["raw", "weather_forecast"],
+    compute_kind="polars",
+)
+def load_weather_forecast(
+    weather_station_county_mapping: pl.LazyFrame, data_path_resource: DataPathResource
+) -> pl.DataFrame:
+    """Load weather forecast data from the given CSV file path and apply optional filters based on start and end dates.
+
+    Args:
+        weather_station_county_mapping: A lazy frame containing the mapping between weather stations and counties.
+        weather_forecast_path: The path to the CSV file containing weather forecast data.
+
+    Returns:
+        pl.LazyFrame: A lazy frame containing the loaded weather forecast data.
+    """
+    weather_forecast: pl.LazyFrame = (
+        pl.scan_csv(data_path_resource.weather_forecast)
+        .drop(["origin_datetime"])
+        .rename({"forecast_datetime": "datetime"})
+    )
+
+    weather_forecast = add_data_block_id(weather_forecast)
+    # weather_forecast = weather_forecast.filter(pl.col("hours_ahead") >= 24)  # we don't need to forecast for today
+    weather_forecast = weather_forecast.with_columns(
+        [
+            pl.col("datetime").str.to_datetime(DATETIME_FORMAT),
+            pl.col("latitude").cast(pl.Float32).round(decimals=2),
+            pl.col("longitude").cast(pl.Float32).round(decimals=2),
+            pl.col("data_block_id").cast(pl.Int16),
+        ]
+    )
+
+    weather_forecast = weather_forecast.join(
+        other=weather_station_county_mapping, how="left", on=["latitude", "longitude"]
+    ).drop(["latitude", "longitude"])
+
+    return (
+        weather_forecast.group_by("county", "datetime", "data_block_id")
+        .agg(
+            pl.col("hours_ahead").mean().cast(pl.Float32),
+            pl.col("temperature").mean().cast(pl.Float32),
+            pl.col("dewpoint").mean().cast(pl.Float32),
+            pl.col("cloudcover_high").mean().cast(pl.Float32),
+            pl.col("cloudcover_low").mean().cast(pl.Float32),
+            pl.col("cloudcover_mid").mean().cast(pl.Float32),
+            pl.col("cloudcover_total").mean().cast(pl.Float32),
+            pl.col("10_metre_u_wind_component").mean().cast(pl.Float32),
+            pl.col("10_metre_v_wind_component").mean().cast(pl.Float32),
+            pl.col("direct_solar_radiation").mean().cast(pl.Float32),
+            pl.col("surface_solar_radiation_downwards").mean().cast(pl.Float32),
+            pl.col("snowfall").mean().cast(pl.Float32),
+            pl.col("total_precipitation").mean().cast(pl.Float32),
+            pl.col("latitude_min").first(),
+            pl.col("latitude_max").first(),
+            pl.col("longitude_min").first(),
+            pl.col("longitude_max").first(),
+            pl.col("county_name").first(),
+        )
+        .collect()
+    )
+
+
 #
 # @asset(name="historical_weather")
 # def load_historical_weather(
