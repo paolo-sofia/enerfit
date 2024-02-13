@@ -40,10 +40,10 @@ def load_clients(data_path_resource: DataPathResource) -> pl.LazyFrame:
     and returns a lazy frame containing the transformed client data.
 
     Args:
-    data_path_resource: The data path resource representing the location of the client data.
+        data_path_resource: The data path resource representing the location of the client data.
 
     Returns:
-    pl.LazyFrame: A lazy frame containing the transformed client data.
+        pl.LazyFrame: A lazy frame containing the transformed client data.
     """
     clients: pl.LazyFrame = pl.scan_csv(data_path_resource.clients)
     clients = add_data_block_id(clients)
@@ -60,32 +60,38 @@ def load_clients(data_path_resource: DataPathResource) -> pl.LazyFrame:
     )
 
 
-#
-# @asset(name="electricity")
-# def load_electricity(electricity_path: pathlib.Path) -> pl.LazyFrame:
-#     """Load electricity data from the given CSV file path and apply optional filters based on start and end dates.
-#
-#     Args:
-#         electricity_path: The path to the CSV file containing electricity data.
-#
-#     Returns:
-#         pl.LazyFrame: A lazy frame containing the loaded electricity data.
-#     """
-#     electricity: pl.LazyFrame = pl.scan_csv(electricity_path).drop(["origin_date"])
-#     electricity = add_data_block_id(electricity)
-#     electricity = electricity.with_columns(
-#         [
-#             pl.col("forecast_date").str.to_datetime(DATETIME_FORMAT) + pl.duration(days=1),
-#             pl.col("euros_per_mwh").cast(pl.Float32),
-#             pl.col("data_block_id").cast(pl.Int16),
-#         ]
-#     ).rename({"forecast_date": "datetime", "euros_per_mwh": "electricity_euros_per_mwh"})
-#
-#     return electricity
-#
+@asset(
+    name="electricity",
+    io_manager_key="polars_parquet_io_manager",
+    key_prefix=["raw", "electricity"],
+    compute_kind="polars",
+)
+def load_electricity(data_path_resource: DataPathResource) -> pl.LazyFrame:
+    """Load electricity data from the given data path resource.
+
+    This function loads electricity data from the specified data path resource, applies transformations to the data,
+    and returns a lazy frame containing the transformed electricity data.
+
+    Args:
+        data_path_resource: The data path resource representing the location of the electricity data.
+
+    Returns:
+        pl.LazyFrame: A lazy frame containing the transformed electricity data.
+    """
+    electricity: pl.LazyFrame = pl.scan_csv(data_path_resource.electricity).drop(["origin_date"])
+    electricity = add_data_block_id(electricity)
+    return electricity.with_columns(
+        [
+            pl.col("forecast_date").str.to_datetime(DATETIME_FORMAT) + pl.duration(days=1),
+            pl.col("euros_per_mwh").cast(pl.Float32),
+            pl.col("data_block_id").cast(pl.Int16),
+        ]
+    ).rename({"forecast_date": "datetime", "euros_per_mwh": "electricity_euros_per_mwh"})
+
+
 #
 # @asset(name="gas")
-# def load_gas(gas_path: pathlib.Path) -> pl.LazyFrame:
+# def load_gas(data_path_resource: DataPathResource) -> pl.LazyFrame:
 #     """Load gas data from the given CSV file path and apply optional filters based on start and end dates.
 #
 #     Args:
