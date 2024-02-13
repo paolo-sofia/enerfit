@@ -224,97 +224,106 @@ def load_weather_forecast(
     )
 
 
-#
-# @asset(name="historical_weather")
-# def load_historical_weather(
-#     weather_station_county_mapping: pl.LazyFrame, historical_weather_path: pathlib.Path
-# ) -> pl.LazyFrame:
-#     """Load historical weather data from the given CSV file path and apply optional filters based on start and end dates.
-#
-#     Args:
-#         weather_station_county_mapping: A lazy frame containing the mapping between weather stations and counties.
-#         historical_weather_path: The path to the CSV file containing historical weather data.
-#
-#     Returns:
-#         pl.LazyFrame: A lazy frame containing the loaded historical weather data.
-#     """
-#     historical_weather: pl.LazyFrame = pl.scan_csv(historical_weather_path)
-#
-#     historical_weather = add_data_block_id(historical_weather)
-#
-#     historical_weather = historical_weather.with_columns(
-#         [
-#             pl.col("datetime").str.to_datetime(DATETIME_FORMAT),
-#             pl.col("latitude").cast(pl.Float32).round(decimals=2),
-#             pl.col("longitude").cast(pl.Float32).round(decimals=2),
-#             pl.col("data_block_id").cast(pl.Int16),
-#         ]
-#     )
-#
-#     historical_weather = historical_weather.join(
-#         other=weather_station_county_mapping, how="left", on=["latitude", "longitude"]
-#     ).drop(["latitude", "longitude"])
-#
-#     historical_weather = historical_weather.group_by("county", "datetime", "data_block_id").agg(
-#         pl.col("temperature").mean(),
-#         pl.col("dewpoint").mean(),
-#         pl.col("rain").mean(),
-#         pl.col("snowfall").mean(),
-#         pl.col("surface_pressure").mean(),
-#         pl.col("cloudcover_total").mean(),
-#         pl.col("cloudcover_low").mean(),
-#         pl.col("cloudcover_mid").mean(),
-#         pl.col("cloudcover_high").mean(),
-#         pl.col("windspeed_10m").mean(),
-#         pl.col("winddirection_10m").mean(),
-#         pl.col("shortwave_radiation").mean(),
-#         pl.col("direct_solar_radiation").mean(),
-#         pl.col("diffuse_radiation").mean(),
-#         pl.col("latitude_min").first(),
-#         pl.col("latitude_max").first(),
-#         pl.col("longitude_min").first(),
-#         pl.col("longitude_max").first(),
-#         pl.col("county_name").first(),
-#     )
-#
-#     # Test set has 1 day offset for hour<11 and 2 day offset for hour>11
-#     return historical_weather.with_columns(
-#         pl.when(pl.col("datetime").dt.hour() < 11)
-#         .then(pl.col("datetime") + pl.duration(days=1))
-#         .otherwise(pl.col("datetime") + pl.duration(days=2))
-#     )
-#
-#
-# @asset(name="train_data")
-# def load_train(train_path: pathlib.Path) -> pl.LazyFrame:
-#     """Load training data from the given CSV file path and apply optional filters based on start and end dates.
-#
-#     Args:
-#         train_path: The path to the CSV file containing training data.
-#
-#     Returns:
-#         pl.LazyFrame: A lazy frame containing the loaded training data.
-#     """
-#     train: pl.LazyFrame = pl.scan_csv(train_path)
-#
-#     train = add_data_block_id(train)
-#
-#     train = train.drop(["prediction_unit_id", "row_id"]).with_columns(
-#         pl.col("datetime").str.to_datetime(DATETIME_FORMAT),
-#         pl.col("is_business").cast(pl.Int8),
-#         pl.col("product_type").cast(pl.Int8),
-#         pl.col("target").cast(pl.Float32),
-#         pl.col("is_consumption").cast(pl.Int8),
-#         pl.col("county").cast(pl.Int8),
-#         pl.col("data_block_id").cast(pl.Int16),
-#     )
-#
-#     return train.with_columns(
-#         pl.col("datetime").cast(pl.Date).alias("date"),
-#         pl.col("datetime").dt.year().alias("year"),
-#         pl.col("datetime").dt.month().alias("month"),
-#         pl.col("datetime").dt.day().alias("day"),
-#         pl.col("datetime").dt.weekday().alias("weekday"),
-#         pl.col("datetime").dt.ordinal_day().alias("day_of_year"),
-#         pl.col("datetime").dt.hour().alias("hour"),
-#     )
+@asset(
+    name="historical_weather",
+    io_manager_key="polars_parquet_io_manager",
+    key_prefix=["raw", "historical_weather"],
+    compute_kind="polars",
+)
+def load_historical_weather(
+    weather_station_county_mapping: pl.LazyFrame, data_path_resource: DataPathResource
+) -> pl.DataFrame:
+    """Load historical weather data from the given CSV file path and apply optional filters based on start and end dates.
+
+    Args:
+        weather_station_county_mapping: A lazy frame containing the mapping between weather stations and counties.
+        historical_weather_path: The path to the CSV file containing historical weather data.
+
+    Returns:
+        pl.LazyFrame: A lazy frame containing the loaded historical weather data.
+    """
+    historical_weather: pl.LazyFrame = pl.scan_csv(data_path_resource.historical_weather)
+
+    historical_weather = add_data_block_id(historical_weather)
+
+    historical_weather = historical_weather.with_columns(
+        [
+            pl.col("datetime").str.to_datetime(DATETIME_FORMAT),
+            pl.col("latitude").cast(pl.Float32).round(decimals=2),
+            pl.col("longitude").cast(pl.Float32).round(decimals=2),
+            pl.col("data_block_id").cast(pl.Int16),
+        ]
+    )
+
+    historical_weather = historical_weather.join(
+        other=weather_station_county_mapping, how="left", on=["latitude", "longitude"]
+    ).drop(["latitude", "longitude"])
+
+    historical_weather = historical_weather.group_by("county", "datetime", "data_block_id").agg(
+        pl.col("temperature").mean().cast(pl.Float32),
+        pl.col("dewpoint").mean().cast(pl.Float32),
+        pl.col("rain").mean().cast(pl.Float32),
+        pl.col("snowfall").mean().cast(pl.Float32),
+        pl.col("surface_pressure").mean().cast(pl.Float32),
+        pl.col("cloudcover_total").mean().cast(pl.Float32),
+        pl.col("cloudcover_low").mean().cast(pl.Float32),
+        pl.col("cloudcover_mid").mean().cast(pl.Float32),
+        pl.col("cloudcover_high").mean().cast(pl.Float32),
+        pl.col("windspeed_10m").mean().cast(pl.Float32),
+        pl.col("winddirection_10m").mean().cast(pl.Float32),
+        pl.col("shortwave_radiation").mean().cast(pl.Float32),
+        pl.col("direct_solar_radiation").mean().cast(pl.Float32),
+        pl.col("diffuse_radiation").mean().cast(pl.Float32),
+        pl.col("latitude_min").first(),
+        pl.col("latitude_max").first(),
+        pl.col("longitude_min").first(),
+        pl.col("longitude_max").first(),
+        pl.col("county_name").first(),
+    )
+
+    # Test set has 1 day offset for hour<11 and 2 day offset for hour>11
+    return historical_weather.with_columns(
+        pl.when(pl.col("datetime").dt.hour() < 11)
+        .then(pl.col("datetime") + pl.duration(days=1))
+        .otherwise(pl.col("datetime") + pl.duration(days=2))
+    ).collect()
+
+
+@asset(
+    name="train",
+    io_manager_key="polars_parquet_io_manager",
+    key_prefix=["raw", "train"],
+    compute_kind="polars",
+)
+def load_train(data_path_resource: DataPathResource) -> pl.LazyFrame:
+    """Load training data from the given CSV file path and apply optional filters based on start and end dates.
+
+    Args:
+        train_path: The path to the CSV file containing training data.
+
+    Returns:
+        pl.LazyFrame: A lazy frame containing the loaded training data.
+    """
+    train: pl.LazyFrame = pl.scan_csv(data_path_resource.train)
+
+    train = add_data_block_id(train)
+
+    train = train.drop(["prediction_unit_id", "row_id"]).with_columns(
+        pl.col("datetime").str.to_datetime(DATETIME_FORMAT),
+        pl.col("is_business").cast(pl.Int8),
+        pl.col("product_type").cast(pl.Int8),
+        pl.col("target").cast(pl.Float32),
+        pl.col("is_consumption").cast(pl.Int8),
+        pl.col("county").cast(pl.Int8),
+        pl.col("data_block_id").cast(pl.Int16),
+    )
+
+    return train.with_columns(
+        pl.col("datetime").cast(pl.Date).alias("date"),
+        pl.col("datetime").dt.year().alias("year"),
+        pl.col("datetime").dt.month().alias("month"),
+        pl.col("datetime").dt.day().alias("day"),
+        pl.col("datetime").dt.weekday().alias("weekday"),
+        pl.col("datetime").dt.ordinal_day().alias("day_of_year"),
+        pl.col("datetime").dt.hour().alias("hour"),
+    )
