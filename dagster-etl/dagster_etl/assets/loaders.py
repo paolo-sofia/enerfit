@@ -1,7 +1,7 @@
 import os
 
 import polars as pl
-from dagster import OpExecutionContext, asset
+from dagster import asset
 
 from ..resources.data_path_resource import DataPathResource
 
@@ -33,7 +33,7 @@ def add_data_block_id(dataframe: pl.LazyFrame) -> pl.LazyFrame:
     key_prefix=["raw", "clients"],
     compute_kind="polars",
 )
-def load_clients(context: OpExecutionContext, data_path_resource: DataPathResource) -> pl.LazyFrame:
+def load_clients(data_path_resource: DataPathResource) -> pl.LazyFrame:
     """Load client data from the given data path resource.
 
     This function loads client data from the specified data path resource, applies transformations to the data,
@@ -45,8 +45,7 @@ def load_clients(context: OpExecutionContext, data_path_resource: DataPathResour
     Returns:
     pl.LazyFrame: A lazy frame containing the transformed client data.
     """
-    context.log.info(f"PORCODIO {data_path_resource}")
-    clients: pl.LazyFrame = pl.scan_csv(data_path_resource.path)
+    clients: pl.LazyFrame = pl.scan_csv(data_path_resource.clients)
     clients = add_data_block_id(clients)
     return clients.with_columns(
         [

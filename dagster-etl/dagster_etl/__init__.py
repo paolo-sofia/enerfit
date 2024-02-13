@@ -12,6 +12,7 @@ BASE_DATA_DIR: pathlib.Path = pathlib.Path("../data")
 
 # get config
 config = load_data_preprocessing_config()
+config["paths"] = {k: str(BASE_DATA_DIR / v) for k, v in config["paths"].items()}
 
 all_assets = load_assets_from_modules([loaders])
 
@@ -25,6 +26,6 @@ defs = Definitions(
     schedules=[clients_schedule],
     resources={
         "polars_parquet_io_manager": polars_parquet_manager,
-        "data_path_resource": DataPathResource(path=str(BASE_DATA_DIR / config.get("paths", {}).get("clients", ""))),
+        "data_path_resource": DataPathResource(**config["paths"]),
     },
 )

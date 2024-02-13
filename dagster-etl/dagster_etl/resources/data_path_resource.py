@@ -10,4 +10,10 @@ class DataPathResource(ConfigurableResource):
     path: The path to the data location, which can be either a `pathlib.Path` object or a string.
     """
 
-    path: str
+    train: str
+    clients: str
+    gas: str
+    electricity: str
+    weather_station_map: str
+    weather_forecast: str
+    historical_weather: str
