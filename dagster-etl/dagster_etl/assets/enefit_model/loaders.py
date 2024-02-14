@@ -32,7 +32,7 @@ def add_data_block_id(dataframe: pl.LazyFrame) -> pl.LazyFrame:
     name="clients",
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "clients", year, month, day],
-    compute_kind="polars",
+    compute_kind="Polars",
     # group_name="loaders",
 )
 def load_clients(data_path_resource: DataPathResource) -> pl.LazyFrame:
@@ -66,7 +66,7 @@ def load_clients(data_path_resource: DataPathResource) -> pl.LazyFrame:
     name="electricity",
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "electricity", year, month, day],
-    compute_kind="polars",
+    compute_kind="Polars",
     # group_name="loaders",
 )
 def load_electricity(data_path_resource: DataPathResource) -> pl.LazyFrame:
@@ -96,7 +96,7 @@ def load_electricity(data_path_resource: DataPathResource) -> pl.LazyFrame:
     name="gas",
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "gas", year, month, day],
-    compute_kind="polars",
+    compute_kind="Polars",
     # group_name="loaders",
 )
 def load_gas(data_path_resource: DataPathResource) -> pl.LazyFrame:
@@ -123,7 +123,7 @@ def load_gas(data_path_resource: DataPathResource) -> pl.LazyFrame:
     name="weather_station_county_mapping",
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw"],
-    compute_kind="polars",
+    compute_kind="Polars",
     # group_name="loaders",
 )
 def load_weather_station_mapping(data_path_resource: DataPathResource) -> pl.DataFrame:
@@ -168,7 +168,7 @@ def load_weather_station_mapping(data_path_resource: DataPathResource) -> pl.Dat
     name="weather_forecast",
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "weather_forecast", year, month, day],
-    compute_kind="polars",
+    compute_kind="Polars",
     # group_name="loaders",
 )
 def load_weather_forecast(
@@ -235,7 +235,7 @@ def load_weather_forecast(
     name="historical_weather",
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "historical_weather", year, month, day],
-    compute_kind="polars",
+    compute_kind="Polars",
     # group_name="loaders",
 )
 def load_historical_weather(
@@ -300,7 +300,7 @@ def load_historical_weather(
     name="train",
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "train", year, month, day],
-    compute_kind="polars",
+    compute_kind="Polars",
     # group_name="loaders",
 )
 def load_train(data_path_resource: DataPathResource) -> pl.LazyFrame:

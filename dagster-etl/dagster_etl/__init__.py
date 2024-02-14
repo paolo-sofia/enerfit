@@ -1,6 +1,6 @@
 import pathlib
 
-from dagster import AssetSelection, Definitions, ScheduleDefinition, define_asset_job
+from dagster import AssetSelection, Definitions, FilesystemIOManager, ScheduleDefinition, define_asset_job
 from dagster_polars.io_managers import PolarsParquetIOManager
 
 from .assets import data_loader_assets
@@ -31,7 +31,7 @@ data_loader_schedule = ScheduleDefinition(
 
 # Define Managers
 polars_parquet_manager = PolarsParquetIOManager(base_dir="../data")
-
+io_manager = FilesystemIOManager(base_dir="../data")
 
 # Definitions a.k.a project
 defs = Definitions(
@@ -39,6 +39,7 @@ defs = Definitions(
     schedules=[data_loader_schedule],
     resources={
         "polars_parquet_io_manager": polars_parquet_manager,
+        "io_manager": io_manager,
         "data_path_resource": DataPathResource(**config["paths"]),
         "model_data_resource": ModelDatasetConfigResource(**config.get("preprocessing", {})),
         "model_config": ModelParametersResource(

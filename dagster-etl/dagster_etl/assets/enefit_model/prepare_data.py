@@ -4,9 +4,8 @@ from typing import Any
 
 import holidays
 import numpy as np
-import pandas as pd
 import polars as pl
-from dagster import asset
+from dagster import OpExecutionContext, asset
 from dagster_etl.resources.model_dataset_config_resource import ModelDatasetConfigResource
 from dagster_etl.utils.configs import load_data_preprocessing_config
 from dagster_etl.utils.preprocessing import get_start_and_end_date_from_config
@@ -217,6 +216,10 @@ def filter_dataframe_by_date(
     filter_column = list(filter(lambda column: "date" in column, dataframe.columns))
     if not filter_column:
         print("No columns containing a date")
+
+    filter_column = filter_column[0]
+
+    return dataframe.filter((pl.col(filter_column) > start_date) & (pl.col(filter_column) <= end_date))
 
 
 def load_and_join_data(
@@ -447,21 +450,6 @@ def feature_engineer(data: pl.LazyFrame) -> pl.LazyFrame:
     return cast_data_to_32_bits(data)
 
 
-def convert_objects_columns_to_category(dataset: pd.DataFrame) -> pd.DataFrame:
-    """Converts object-type columns in the given DataFrame to the category type.
-
-    Args:
-        dataset: The DataFrame containing the columns to be converted.
-
-    Returns:
-        The DataFrame with the object-type columns converted to the category type.
-    """
-    for col in dataset.columns:
-        if dataset[col].dtype == "object":
-            dataset[col] = dataset[col].astype("category")
-    return dataset
-
-
 @asset(
     name="training_dataset",
     io_manager_key="polars_parquet_io_manager",
@@ -469,6 +457,7 @@ def convert_objects_columns_to_category(dataset: pd.DataFrame) -> pd.DataFrame:
     compute_kind="polars",
 )
 def create_train_dataset(
+    context: OpExecutionContext,
     train: pl.LazyFrame,
     clients: pl.LazyFrame,
     electricity: pl.LazyFrame,
@@ -476,7 +465,7 @@ def create_train_dataset(
     historical_weather: pl.LazyFrame,
     weather_forecast: pl.LazyFrame,
     model_data_resource: ModelDatasetConfigResource,
-) -> pd.DataFrame:
+) -> pl.LazyFrame:
     """Create the training dataset for the model.
 
     Args:
@@ -495,13 +484,15 @@ def create_train_dataset(
         This function is decorated with `@asset` to define the asset properties.
 
     Examples:
-        >>> create_train_dataset(train, clients, electricity, gas, historical_weather, weather_forecast, config)
+        >>> create_train_dataset(train, clients, electricity, gas, historical_weather, weather_forecast, model_data_resource)
         pd.DataFrame(...)
     """
     start_date, end_date = get_start_and_end_date_from_config(
-        model_data_resource.train_months, model_data_resource.test_months
+        train, model_data_resource.train_months, model_data_resource.test_months
     )
 
+    context.log.info(f"start date: {start_date}")
+    context.log.info(f"end date: {end_date}")
     train = filter_dataframe_by_date(train, start_date, end_date)
     clients = filter_dataframe_by_date(clients, start_date, end_date)
     gas = filter_dataframe_by_date(gas, start_date, end_date)
@@ -527,8 +518,8 @@ def create_train_dataset(
     #     data = data.select(columns)
 
     if model_data_resource.add_noise_column:
-        data = add_noise_feature_for_training(data).to_pandas()
-    else:
-        data.collect().to_pandas()
+        data = add_noise_feature_for_training(data).lazy()  # .to_pandas()
 
-    return convert_objects_columns_to_category(data)
+    return data
+
+    # return convert_objects_columns_to_category(data)

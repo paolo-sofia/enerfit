@@ -1,7 +1,6 @@
 import datetime
 
 import polars as pl
-import pytz
 from dateutil.relativedelta import relativedelta
 
 
@@ -21,7 +20,7 @@ def add_data_block_id(dataframe: pl.LazyFrame) -> pl.LazyFrame:
 
 
 def get_start_and_end_date_from_config(
-    train_months: int = 6, test_months: int = 3
+    data: pl.LazyFrame, train_months: int = 6, test_months: int = 3
 ) -> tuple[datetime.date, datetime.date]:
     """Get the start and end date based on the specified number of training and testing months.
 
@@ -32,6 +31,8 @@ def get_start_and_end_date_from_config(
     Returns:
         tuple[datetime.date, datetime.date]: A tuple containing the start date and today's date.
     """
-    today: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Rome")).today()
-    start_date = today - relativedelta(months=train_months + test_months)
-    return start_date, today
+    max_dataset_date: datetime.date = data.select(pl.col("datetime")).max().collect().item(row=0, column=0)
+
+    # today: datetime.date = datetime.datetime.now(tz=pytz.timezone("Europe/Rome")).today()
+    start_date = max_dataset_date - relativedelta(months=train_months + test_months)
+    return start_date, max_dataset_date
