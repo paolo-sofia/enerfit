@@ -33,7 +33,7 @@ def add_data_block_id(dataframe: pl.LazyFrame) -> pl.LazyFrame:
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "clients", year, month, day],
     compute_kind="Polars",
-    # group_name="loaders",
+    group_name="loaders",
 )
 def load_clients(data_path_resource: DataPathResource) -> pl.LazyFrame:
     """Load client data from the given data path resource.
@@ -67,7 +67,7 @@ def load_clients(data_path_resource: DataPathResource) -> pl.LazyFrame:
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "electricity", year, month, day],
     compute_kind="Polars",
-    # group_name="loaders",
+    group_name="loaders",
 )
 def load_electricity(data_path_resource: DataPathResource) -> pl.LazyFrame:
     """Load electricity data from the given data path resource.
@@ -97,7 +97,7 @@ def load_electricity(data_path_resource: DataPathResource) -> pl.LazyFrame:
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "gas", year, month, day],
     compute_kind="Polars",
-    # group_name="loaders",
+    group_name="loaders",
 )
 def load_gas(data_path_resource: DataPathResource) -> pl.LazyFrame:
     gas: pl.LazyFrame = pl.scan_csv(data_path_resource.gas).drop(["origin_date"])
@@ -124,7 +124,7 @@ def load_gas(data_path_resource: DataPathResource) -> pl.LazyFrame:
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw"],
     compute_kind="Polars",
-    # group_name="loaders",
+    group_name="loaders",
 )
 def load_weather_station_mapping(data_path_resource: DataPathResource) -> pl.DataFrame:
     """Load the weather station to county mapping data from a CSV file and perform data transformations.
@@ -169,7 +169,7 @@ def load_weather_station_mapping(data_path_resource: DataPathResource) -> pl.Dat
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "weather_forecast", year, month, day],
     compute_kind="Polars",
-    # group_name="loaders",
+    group_name="loaders",
 )
 def load_weather_forecast(
     weather_station_county_mapping: pl.LazyFrame, data_path_resource: DataPathResource
@@ -236,7 +236,7 @@ def load_weather_forecast(
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "historical_weather", year, month, day],
     compute_kind="Polars",
-    # group_name="loaders",
+    group_name="loaders",
 )
 def load_historical_weather(
     weather_station_county_mapping: pl.LazyFrame, data_path_resource: DataPathResource
@@ -301,7 +301,7 @@ def load_historical_weather(
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["raw", "train", year, month, day],
     compute_kind="Polars",
-    # group_name="loaders",
+    group_name="loaders",
 )
 def load_train(data_path_resource: DataPathResource) -> pl.LazyFrame:
     """Load training data from the given CSV file path and apply optional filters based on start and end dates.

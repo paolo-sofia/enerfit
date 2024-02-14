@@ -455,6 +455,7 @@ def feature_engineer(data: pl.LazyFrame) -> pl.LazyFrame:
     io_manager_key="polars_parquet_io_manager",
     key_prefix=["model", "dataset"],
     compute_kind="polars",
+    group_name="training_dataset",
 )
 def create_train_dataset(
     context: OpExecutionContext,

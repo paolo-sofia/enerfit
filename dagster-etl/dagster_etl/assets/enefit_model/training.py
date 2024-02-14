@@ -178,6 +178,7 @@ def train_model(
     name="producer_model",
     key_prefix=["model", "models", "producer", year, month, day],
     compute_kind="LightGBM",
+    group_name="model_training",
 )
 def train_producer_model(
     training_dataset: pl.LazyFrame,
@@ -211,6 +212,7 @@ def train_producer_model(
     name="consumer_model",
     key_prefix=["model", "models", "consumer", year, month, day],
     compute_kind="LightGBM",
+    group_name="model_training",
 )
 def train_consumer_model(
     training_dataset: pl.LazyFrame,
